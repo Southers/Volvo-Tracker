@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volvo Marketing Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f8f8; }
+        .animate-fade-in-up { animation: fadeInUp 0.5s ease-out; }
+        .animate-fade-in-down { animation: fadeInDown 0.5s ease-out; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translate(0, 20px); } to { opacity: 1; transform: translate(0, 0); } }
+        @keyframes fadeInDown { from { opacity: 0; transform: translate(0, -10px); } to { opacity: 1; transform: translate(0, 0); } }
+        
+        .volvo-btn-primary { background-color: #171717; color: white; border-radius: 2px; transition: all 0.2s; }
+        .volvo-btn-primary:hover { background-color: #333333; }
+        .volvo-btn-secondary { background-color: white; color: #171717; border: 1px solid #e5e5e5; border-radius: 2px; transition: all 0.2s; }
+        .volvo-btn-secondary:hover { border-color: #171717; background-color: #f9fafb; }
+        .volvo-input { width: 100%; padding: 0.75rem; background-color: white; border: 1px solid #e2e8f0; border-radius: 2px; outline: none; transition: border-color 0.2s; }
+        .volvo-input:focus { border-color: #171717; }
+        .volvo-select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+    <!-- Safety Timeout Script -->
+    <script>
+        window.onload = function() {
+            setTimeout(() => {
+                const loader = document.getElementById('loading-message');
+                const root = document.getElementById('root');
+                if (loader && loader.style.display !== 'none' && (!root || root.childElementCount === 0)) {
+                    loader.innerHTML = '<div style="max-width:400px; text-align:center;"><h3 style="font-weight:bold; color:#ef4444; margin-bottom:8px;">Startup Timeout</h3><p style="font-size:14px;">The application script failed to initialize. Check console for details.</p></div>';
+                }
+            }, 8000);
+        }
+    </script>
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.3.1",
+            "react-dom": "https://esm.sh/react-dom@18.3.1",
+            "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+            "htm": "https://esm.sh/htm@3.1.1",
+            "lucide-react": "https://esm.sh/lucide-react@0.344.0?external=react,react-dom",
+            "recharts": "https://esm.sh/recharts@2.12.2?external=react,react-dom",
+            "firebase/app": "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js",
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js",
+            "firebase/auth": "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js"
+        }
+    }
+    </script>
+</head>
+<body class="text-slate-900 h-screen w-screen overflow-hidden bg-white">
+    <!-- Preloader -->
+    <div id="loading-message" class="fixed inset-0 flex items-center justify-center bg-white z-50 text-slate-500 font-light flex-col gap-4">
+        <div class="animate-pulse">Loading Application Resources...</div>
+        <div id="error-details" class="text-red-500 text-xs hidden max-w-lg text-center px-4"></div>
+    </div>
+    
+    <div id="root" class="h-full w-full"></div>
+
+    <script type="module">
+        import React, { useState, useMemo, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import htm from 'htm';
+        import * as LucideIcons from 'lucide-react';
+        import * as Recharts from 'recharts';
+        
+        import { initializeApp } from 'firebase/app';
+        import { getFirestore, doc, onSnapshot, setDoc } from 'firebase/firestore';
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+        
+        const html = htm.bind(React.createElement);
+        
+        // --- SAFE ICON WRAPPER ---
+        const getIcon = (name) => {
+            if (LucideIcons && LucideIcons[name]) return LucideIcons[name];
+            return () => null; 
+        };
+        
+        const LayoutDashboard = getIcon('LayoutDashboard');
+        const PlusCircle = getIcon('PlusCircle');
+        const Calendar = getIcon('Calendar');
+        const CheckSquare = getIcon('CheckSquare');
+        const TrendingUp = getIcon('TrendingUp');
+        const Users = getIcon('Users');
+        const Save = getIcon('Save');
+        const Trash2 = getIcon('Trash2');
+        const Globe = getIcon('Globe');
+        const ChevronDown = getIcon('ChevronDown');
+        const Activity = getIcon('Activity');
+        const BarChart2 = getIcon('BarChart2');
+        const Clock = getIcon('Clock');
+        const AlertCircle = getIcon('AlertCircle');
+        const ArrowRight = getIcon('ArrowRight');
+        const List = getIcon('List');
+        const Kanban = getIcon('Kanban');
+        const History = getIcon('History');
+        const FileCheck = getIcon('FileCheck');
+        const X = getIcon('X');
+        const Edit3 = getIcon('Edit3');
+        const ExternalLink = getIcon('ExternalLink');
+        const TrendingDown = getIcon('TrendingDown');
+        const PlayCircle = getIcon('PlayCircle');
+        const Download = getIcon('Download');
+        const Upload = getIcon('Upload');
+        const RefreshCw = getIcon('RefreshCw');
+        const FilterIcon = getIcon('Filter');
+        const MousePointerClick = getIcon('MousePointerClick');
+        const UserCheck = getIcon('UserCheck');
+        const ShoppingBag = getIcon('ShoppingBag');
+        const Zap = getIcon('Zap');
+        const Eye = getIcon('Eye');
+        const Database = getIcon('Database');
+        const ArrowLeftRight = getIcon('ArrowLeftRight');
+        const Settings = getIcon('Settings');
+        const Coins = getIcon('Coins');
+        const Copy = getIcon('Copy');
+        const Briefcase = getIcon('Briefcase');
+        const Cloud = getIcon('Cloud');
+        const Lock = getIcon('Lock');
+        const LogIn = getIcon('LogIn');
+        const LogOut = getIcon('LogOut');
+
+        // --- RECHARTS WRAPPER ---
+        const RechartsLib = Recharts.default || Recharts;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart, Cell, AreaChart, Area, FunnelChart, Funnel, LabelList } = RechartsLib;
+
+        // --- CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDm5PjTaJqBVOz7ogEFygD1XOAJ5B5udtg",
+            authDomain: "volvo-third-party-tracker.firebaseapp.com",
+            projectId: "volvo-third-party-tracker",
+            storageBucket: "volvo-third-party-tracker.firebasestorage.app",
+            messagingSenderId: "784447308952",
+            appId: "1:784447308952:web:2e77f020d4757ebcbefced",
+            measurementId: "G-4MRVB6MQ2D"
+        };
+
+        // Init Firebase with Fallback
+        let db, auth, isOffline = false;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            console.log("Firebase Initialized Successfully");
+        } catch (error) {
+            console.error("Firebase Init Error", error);
+            const errDiv = document.getElementById('error-details');
+            if(errDiv) {
+                errDiv.style.display = 'block';
+                errDiv.innerText = "Running in Local/Demo Mode. (Firebase Error: " + error.message + ")";
+            }
+            isOffline = true;
+        }
+
+        const DB_DOC_ID = "master_data"; 
+
+        const PROVIDERS = ['Carwow', 'Autotrader', 'Leasing.com', 'WhatCar?', 'PistonHeads'];
+        const MARKET_RATES = {
+            'Carwow': { leadToSale: 0.15, avgGP: 1500, ctr: 0.05 },
+            'Autotrader': { leadToSale: 0.12, avgGP: 1200, ctr: 0.02 },
+            'Leasing.com': { leadToSale: 0.10, avgGP: 1000, ctr: 0.06 },
+            'WhatCar?': { leadToSale: 0.08, avgGP: 1100, ctr: 0.015 },
+            'PistonHeads': { leadToSale: 0.05, avgGP: 900, ctr: 0.01 }
+        };
+
+        const DEFAULT_CONFIG = {
+            fiscalLabel: "FY 2024",
+            annualBudget: 500000,
+            q1: 125000, q2: 125000, q3: 125000, q4: 125000
+        };
+
+        const INITIAL_DATA = { campaigns: [], config: DEFAULT_CONFIG };
+
+        const formatCurrency = (val) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(val);
+        const formatNumber = (val) => new Intl.NumberFormat('en-GB').format(val);
+
+        // --- COMPONENTS ---
+
+        function LoginScreen({ onLogin }) {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState(null);
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError(null);
+                try {
+                    await onLogin(email, password);
+                } catch (err) {
+                    console.error("Login Error:", err);
+                    setError("Access Denied. Please check credentials.");
+                }
+                setLoading(false);
+            };
+
+            return html`
+                <div className="h-full w-full flex items-center justify-center bg-white relative">
+                    <div className="absolute top-0 left-0 w-full h-2 bg-black"></div>
+                    <div className="w-full max-w-md p-10 animate-fade-in-up">
+                        <div className="text-center mb-10">
+                            <span className="text-3xl font-bold tracking-[0.2em] text-black block mb-2">VOLVO</span>
+                            <span className="text-xs text-slate-400 font-medium tracking-widest uppercase">Marketing Intelligence</span>
+                        </div>
+                        
+                        <div className="bg-white">
+                            <form onSubmit=${handleSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Email Address</label>
+                                    <input type="email" required className="volvo-input w-full bg-slate-50 focus:bg-white" value=${email} onChange=${e => setEmail(e.target.value)} placeholder="name@volvocars.com" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Password</label>
+                                    <input type="password" required className="volvo-input w-full bg-slate-50 focus:bg-white" value=${password} onChange=${e => setPassword(e.target.value)} placeholder="••••••••" />
+                                </div>
+                                ${error ? html`<div className="p-3 bg-red-50 border border-red-100 text-red-600 text-xs rounded-sm">${error}</div>` : null}
+                                <button type="submit" disabled=${loading} className="volvo-btn-primary w-full py-4 text-sm font-bold tracking-wide uppercase flex justify-center items-center gap-2">
+                                    ${loading ? html`<${RefreshCw} class="animate-spin" size=${16}/> Authenticating...` : 'Secure Login'}
+                                </button>
+                            </form>
+                            <p className="text-center text-xs text-slate-300 mt-8">Restricted Access. Authorized Personnel Only.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function VolvoCard({ title, value, trend }) {
+            return html`
+                <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-2">
+                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${title}</h4>
+                        ${trend !== undefined ? html`
+                            <div className=${`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${trend ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                ${trend ? 'On Target' : 'Below Target'}
+                            </div>
+                        ` : null}
+                    </div>
+                    <h2 className="text-2xl font-light text-slate-900 tracking-tight">${value}</h2>
+                </div>
+            `;
+        }
+
+        function SidebarItem({ active, onClick, icon: Icon, label }) {
+            return html`
+                <button onClick=${onClick} className=${`w-full flex items-center gap-3 px-4 py-3 border-l-4 transition-all text-sm group text-left ${active ? 'border-black bg-slate-50 text-black font-bold' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50 font-medium'}`}>
+                    <${Icon} className=${`w-4 h-4 flex-shrink-0 ${active ? 'text-black' : 'text-slate-400 group-hover:text-slate-900'}`} />
+                    <span className="truncate">${label}</span>
+                </button>
+            `;
+        }
+
+        function SettingsView({ config, onSave }) {
+            const [form, setForm] = useState(config);
+            const handleChange = (key, val) => setForm({...form, [key]: val});
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSave({
+                    ...form,
+                    annualBudget: parseFloat(form.annualBudget),
+                    q1: parseFloat(form.q1), q2: parseFloat(form.q2), q3: parseFloat(form.q3), q4: parseFloat(form.q4),
+                });
+            };
+            return html`
+                <div className="max-w-4xl mx-auto bg-white p-8 rounded-sm border border-slate-200 shadow-sm animate-fade-in-down">
+                    <div className="mb-8 border-b border-slate-100 pb-6"><h3 className="text-xl font-light text-slate-900">System Configuration</h3></div>
+                    <form onSubmit=${handleSubmit} className="space-y-8">
+                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fiscal Year Label</label><input type="text" className="volvo-input max-w-sm" value=${form.fiscalLabel} onChange=${e => handleChange('fiscalLabel', e.target.value)} /></div>
+                        <div className="p-6 bg-slate-50 rounded-sm border border-slate-100">
+                            <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2"><${Coins} size=${16} /> Budget Allocation</h4>
+                            <div className="grid grid-cols-2 gap-6 mb-6"><div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Total Annual Budget (£)</label><input type="number" className="volvo-input font-bold" value=${form.annualBudget} onChange=${e => handleChange('annualBudget', e.target.value)} /></div></div>
+                            <div className="grid grid-cols-4 gap-4">
+                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Q1 Budget</label><input type="number" className="volvo-input" value=${form.q1} onChange=${e => handleChange('q1', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Q2 Budget</label><input type="number" className="volvo-input" value=${form.q2} onChange=${e => handleChange('q2', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Q3 Budget</label><input type="number" className="volvo-input" value=${form.q3} onChange=${e => handleChange('q3', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Q4 Budget</label><input type="number" className="volvo-input" value=${form.q4} onChange=${e => handleChange('q4', e.target.value)} /></div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end"><button type="submit" className="volvo-btn-primary px-6 py-3 text-sm font-bold flex items-center gap-2"><${Save} size=${16} /> Save Configuration</button></div>
+                    </form>
+                </div>
+            `;
+        }
+
+        function PartnerIntelligenceView({ campaigns }) {
+             const completed = campaigns.filter(c => c.status === 'Completed' && c.type === 'Conversion');
+             const data = useMemo(() => {
+                 const map = {};
+                 completed.forEach(c => {
+                     if (!map[c.provider]) map[c.provider] = { provider: c.provider, spend: 0, leads: 0, sales: 0, gp: 0 };
+                     map[c.provider].spend += c.actuals.spend;
+                     map[c.provider].leads += c.actuals.leads;
+                     map[c.provider].sales += c.actuals.sales;
+                     map[c.provider].gp += c.actuals.gp;
+                 });
+                 return Object.values(map).map(p => ({
+                     ...p,
+                     cpa: p.sales > 0 ? p.spend / p.sales : 0,
+                     roas: p.spend > 0 ? p.gp / p.spend : 0,
+                     cpl: p.leads > 0 ? p.spend / p.leads : 0,
+                     lqi: p.leads > 0 ? (p.sales / p.leads) * 100 : 0
+                 })).sort((a,b) => b.roas - a.roas);
+             }, [completed]);
+
+             return html`
+                 <div className="max-w-6xl mx-auto space-y-8 animate-fade-in-down">
+                    <div className="bg-white p-8 rounded-sm border border-slate-200 shadow-sm">
+                        <div className="flex items-center gap-2 mb-6"><${Briefcase} size=${20} className="text-black"/><h3 className="font-bold text-slate-900 text-lg">Partner Intelligence Matrix (Conversion Only)</h3></div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th className="px-6 py-4">Partner</th><th className="px-6 py-4 text-right">Total Spend</th><th className="px-6 py-4 text-right">Leads</th><th className="px-6 py-4 text-right">Cost Per Lead</th><th className="px-6 py-4 text-right">Sales</th><th className="px-6 py-4 text-right">Conv. Rate (LQI)</th><th className="px-6 py-4 text-right">CPA</th><th className="px-6 py-4 text-right">ROAS</th></tr></thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    ${data.map((row, idx) => html`
+                                        <tr key=${idx} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 font-bold text-slate-900">${row.provider}</td>
+                                            <td className="px-6 py-4 text-right text-slate-600">${formatCurrency(row.spend)}</td>
+                                            <td className="px-6 py-4 text-right text-slate-600">${formatNumber(row.leads)}</td>
+                                            <td className="px-6 py-4 text-right text-slate-600">${formatCurrency(row.cpl)}</td>
+                                            <td className="px-6 py-4 text-right font-bold text-slate-900">${row.sales}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className=${`px-2 py-1 rounded text-[10px] font-bold ${row.lqi > 10 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>${row.lqi.toFixed(1)}%</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-medium">${formatCurrency(row.cpa)}</td>
+                                            <td className="px-6 py-4 text-right font-bold text-emerald-600">${row.roas.toFixed(2)}x</td>
+                                        </tr>
+                                    `)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                 </div>
+             `;
+        }
+
+        function DashboardView({ campaigns, config }) {
+            const completed = campaigns.filter(c => c.status === 'Completed');
+            const planned = campaigns.filter(c => c.status === 'Planned');
+            const stats = useMemo(() => {
+                let spend=0, sales=0, gp=0;
+                const chartData = {};
+                completed.forEach(c => {
+                    spend += parseFloat(c.actuals.spend)||0; sales += parseFloat(c.actuals.sales)||0; gp += parseFloat(c.actuals.gp)||0;
+                    if(!chartData[c.provider]) chartData[c.provider] = { provider: c.provider, spend: 0, gp: 0 };
+                    chartData[c.provider].spend += parseFloat(c.actuals.spend)||0; chartData[c.provider].gp += parseFloat(c.actuals.gp)||0;
+                });
+                const chartArray = Object.values(chartData).map(d => ({ ...d, roas: d.spend>0 ? d.gp/d.spend : 0 }));
+                return { spend, sales, roas: spend>0 ? (gp/spend).toFixed(2) : 0, cpa: sales>0 ? (spend/sales).toFixed(0) : 0, chartArray };
+            }, [completed]);
+
+            const budgetStats = useMemo(() => {
+                const totalSpent = completed.reduce((acc, c) => acc + (parseFloat(c.actuals.spend)||0), 0);
+                const totalPlanned = planned.reduce((acc, c) => acc + (parseFloat(c.plan.spend)||0), 0);
+                const totalCommitted = totalSpent + totalPlanned;
+                const remaining = config.annualBudget - totalCommitted;
+                const spentPct = (totalSpent / config.annualBudget) * 100;
+                const committedPct = (totalCommitted / config.annualBudget) * 100;
+                return { totalSpent, totalPlanned, totalCommitted, remaining, spentPct, committedPct };
+            }, [completed, planned, config]);
+
+            const copyReport = () => {
+                const text = `VOLVO UPDATE (${config.fiscalLabel})\nInv: ${formatCurrency(stats.spend)}\nSales: ${stats.sales}\nROAS: ${stats.roas}x\nBudget Used: ${budgetStats.spentPct.toFixed(1)}%`;
+                navigator.clipboard.writeText(text);
+                alert("Report copied!");
+            };
+
+            return html`
+                <div className="space-y-8 animate-fade-in-down">
+                    <div className="flex justify-end"><button onClick=${copyReport} className="volvo-btn-secondary px-4 py-2 text-xs font-bold flex items-center gap-2"><${Copy} size=${12}/> Copy Summary</button></div>
+                    <div className="bg-white p-8 rounded-sm border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-start mb-6"><div><h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-1">Annual Budget Pacing</h4><p className="text-xs text-slate-500">${config.fiscalLabel}</p></div><div className="text-right"><span className="text-3xl font-light text-slate-900">${formatCurrency(config.annualBudget)}</span><p className="text-[10px] text-slate-400 uppercase font-bold mt-1">Total Budget</p></div></div>
+                        <div className="relative w-full h-4 bg-slate-100 rounded-full overflow-hidden mb-4"><div className="absolute top-0 left-0 h-full bg-slate-800 z-20" style=${{width: `${Math.min(budgetStats.spentPct, 100)}%`}}></div><div className="absolute top-0 left-0 h-full bg-slate-300 z-10" style=${{width: `${Math.min(budgetStats.committedPct, 100)}%`}}></div></div>
+                        <div className="grid grid-cols-3 gap-4 text-sm"><div><div className="flex items-center gap-2 mb-1"><div className="w-2 h-2 rounded-full bg-slate-800"></div><span className="font-bold">Actual Spent</span></div><p className="text-slate-600 pl-4">${formatCurrency(budgetStats.totalSpent)}</p></div><div><div className="flex items-center gap-2 mb-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div><span className="font-bold">Planned Future</span></div><p className="text-slate-600 pl-4">${formatCurrency(budgetStats.totalPlanned)}</p></div><div><div className="flex items-center gap-2 mb-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="font-bold text-emerald-700">Remaining</span></div><p className="text-emerald-600 pl-4 font-bold">${formatCurrency(budgetStats.remaining)}</p></div></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <${VolvoCard} title="Total Investment (YTD)" value=${formatCurrency(stats.spend)} />
+                        <${VolvoCard} title="Total Orders (YTD)" value=${stats.sales} />
+                        <${VolvoCard} title="Blended ROAS" value=${`${stats.roas}x`} trend=${stats.roas > 3.5} />
+                        <${VolvoCard} title="Actual CPA" value=${formatCurrency(stats.cpa)} />
+                    </div>
+                    <div className="bg-white p-8 rounded-sm border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-8"><h3 className="font-bold text-slate-900">Partner Efficiency</h3></div>
+                        <div className="h-96 w-full"><${ResponsiveContainer} width="100%" height="100%"><${ComposedChart} data=${stats.chartArray}><${CartesianGrid} stroke="#f1f5f9" vertical=${false} /><${XAxis} dataKey="provider" tick=${{fontSize: 12, fill: '#64748b'}} axisLine=${false} tickLine=${false} /><${YAxis} yAxisId="left" orientation="left" stroke="transparent" /><${YAxis} yAxisId="right" orientation="right" stroke="transparent" /><${Tooltip} contentStyle=${{ borderRadius: '2px', border: '1px solid #e2e8f0', boxShadow: 'none' }} /><${Bar} yAxisId="left" dataKey="spend" name="Spend (£)" fill="#e5e7eb" barSize=${48} /><${Line} yAxisId="right" type="monotone" dataKey="roas" name="ROAS" stroke="#171717" strokeWidth=${2} dot=${{r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2}} /></${ComposedChart}></${ResponsiveContainer}></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function CampaignList({ campaigns, onSelect, onDuplicate }) {
+            const sorted = [...campaigns].sort((a,b) => a.month.localeCompare(b.month));
+            return html`
+                <div className="space-y-3 animate-fade-in-down">
+                    ${sorted.map(c => html`
+                        <div key=${c.id} className="bg-white p-6 rounded-sm border border-slate-200 shadow-sm flex items-center gap-6 hover:border-black transition-all group">
+                            <div className="w-24 text-center border-r border-slate-100 pr-6"><div className="text-sm font-bold text-slate-900">${c.month}</div><div className=${`text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm mt-1 inline-block ${c.status === 'Planned' ? 'bg-slate-100 text-slate-600' : 'bg-black text-white'}`}>{c.status}</div></div>
+                            <div className="flex-1 cursor-pointer" onClick=${() => onSelect(c)}>
+                                <div className="flex justify-between items-start">
+                                    <div><div className="flex items-center gap-2"><h4 className="font-bold text-slate-900 text-lg group-hover:text-blue-700 transition-colors">${c.name}</h4><span className="text-[10px] border px-1 rounded text-slate-500">${c.type}</span></div><p className="text-sm text-slate-500 mt-1">${c.provider}</p></div>
+                                    <div className="text-right"><p className="text-[10px] font-bold text-slate-400 uppercase">Spend</p><p className="font-light text-2xl text-slate-900">£${formatNumber(c.status === 'Completed' ? c.actuals.spend : c.plan.spend)}</p></div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick=${() => onDuplicate(c)} className="p-2 text-slate-300 hover:text-black transition-colors" title="Duplicate"><${Copy} size=${18} /></button>
+                                <button onClick=${() => onSelect(c)} className="p-2 text-slate-300 hover:text-black transition-colors" title="Edit"><${Edit3} size=${18} /></button>
+                            </div>
+                        </div>
+                    `)}
+                </div>
+            `;
+        }
+
+        function ComparisonView({ campaigns }) {
+            const [selectedIdA, setSelectedIdA] = useState('');
+            const [selectedIdB, setSelectedIdB] = useState('');
+            const campaignA = campaigns.find(c => c.id === parseInt(selectedIdA));
+            const campaignB = campaigns.find(c => c.id === parseInt(selectedIdB));
+
+            const getMetrics = (campaign) => {
+                if (!campaign) return null;
+                const isPlanned = campaign.status === 'Planned';
+                const source = isPlanned ? campaign.plan : campaign.actuals;
+                return {
+                    spend: source.spend || 0,
+                    impressions: source.impressions || 0,
+                    leads: source.leads || 0,
+                    sales: isPlanned ? (source.leads * (MARKET_RATES[campaign.provider]?.leadToSale || 0.1)) : (source.sales || 0),
+                    roas: isPlanned ? ((source.leads * (MARKET_RATES[campaign.provider]?.leadToSale || 0.1) * (MARKET_RATES[campaign.provider]?.avgGP || 1000)) / source.spend) : (source.gp / source.spend),
+                    isPlanned
+                };
+            };
+            const metricsA = getMetrics(campaignA);
+            const metricsB = getMetrics(campaignB);
+
+            const renderRow = (label, valA, valB, type) => {
+                 const a = parseFloat(valA)||0; const b = parseFloat(valB)||0;
+                 const diff = b-a; const pct = a!==0?(diff/a)*100:0;
+                 const dispA = type==='c'?formatCurrency(a):type==='d'?a.toFixed(2):formatNumber(a);
+                 const dispB = type==='c'?formatCurrency(b):type==='d'?b.toFixed(2):formatNumber(b);
+                 return html`
+                     <div className="grid grid-cols-3 gap-4 py-4 border-b border-slate-100 items-center">
+                        <div className="text-right font-medium text-slate-700">${dispA}</div>
+                        <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-wider">${label}</div>
+                        <div className="text-left font-medium text-slate-700 flex items-center gap-2">${dispB}${metricsA&&metricsB ? html`<span className=${`text-[10px] ${diff>0?'text-emerald-600':'text-red-500'} bg-slate-50 px-1.5 py-0.5 rounded`}>${diff>0?'+':''}${pct.toFixed(0)}%</span>` : null}</div>
+                     </div>
+                 `;
+            };
+
+            return html`
+                <div className="max-w-4xl mx-auto space-y-8 animate-fade-in-down">
+                     <div className="grid grid-cols-2 gap-8 bg-white p-6 rounded-sm border border-slate-200 shadow-sm">
+                        <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Campaign A</label><select className="volvo-select w-full p-2 bg-slate-50 border border-slate-200 rounded-sm text-sm" value=${selectedIdA} onChange=${e=>setSelectedIdA(e.target.value)}><option value="">Select...</option>${campaigns.map(c=>html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}</select></div>
+                        <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Campaign B</label><select className="volvo-select w-full p-2 bg-slate-50 border border-slate-200 rounded-sm text-sm" value=${selectedIdB} onChange=${e=>setSelectedIdB(e.target.value)}><option value="">Select...</option>${campaigns.map(c=>html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}</select></div>
+                     </div>
+                     ${campaignA && campaignB && metricsA && metricsB ? html`
+                         <div className="bg-white rounded-sm border border-slate-200 shadow-sm p-8">
+                             <div className="grid grid-cols-2 gap-4 mb-6 border-b border-slate-100 pb-4">
+                                <div className="text-right"><h3 className="font-bold text-slate-900">${campaignA.name}</h3><span className="text-xs text-slate-500">${campaignA.status}</span></div>
+                                <div className="text-left"><h3 className="font-bold text-slate-900">${campaignB.name}</h3><span className="text-xs text-slate-500">${campaignB.status}</span></div>
+                             </div>
+                             ${renderRow('Total Spend', metricsA.spend, metricsB.spend, 'c')}
+                             ${renderRow('Impressions', metricsA.impressions, metricsB.impressions)}
+                             ${renderRow('Leads / Clicks', metricsA.leads || metricsA.clicks, metricsB.leads || metricsB.clicks)}
+                             ${renderRow('Est/Act Sales', metricsA.sales, metricsB.sales, 'd')}
+                             ${renderRow('ROAS (x)', metricsA.roas, metricsB.roas, 'd')}
+                         </div>
+                     ` : null}
+                </div>
+            `;
+        }
+        
+        function CampaignDetailsModal({ campaign, onClose, onUpdate, rates }) {
+            const [viewMode, setViewMode] = useState('summary'); 
+            const [formData, setFormData] = useState(null);
+
+            useEffect(() => {
+                if (campaign) {
+                    const data = JSON.parse(JSON.stringify(campaign));
+                    if (data.status === 'Planned' && !data.actuals) {
+                        data.actuals = { 
+                            spend: data.plan.spend, 
+                            impressions: data.plan.impressions, 
+                            clicks: data.plan.clicks || 0,
+                            leads: data.plan.leads, 
+                            sales: 0, gp: 0, appointments: 0 
+                        };
+                    }
+                    setFormData(data);
+                    setViewMode('summary');
+                }
+            }, [campaign]);
+
+            if (!campaign || !formData) return null;
+
+            const isPlanned = formData.status === 'Planned';
+            const isAwareness = formData.type === 'Awareness';
+            
+            const cv = (act, pln, reverse) => {
+                const a = parseFloat(act)||0; const p = parseFloat(pln)||0; 
+                if(p===0) return '-';
+                const v = ((a-p)/p)*100;
+                let c = reverse ? (v>0?'text-red-500':'text-emerald-600') : (v>=0?'text-emerald-600':'text-red-500');
+                return html`<span className=${`text-[10px] font-bold ${c}`}>${v>0?'+':''}${v.toFixed(0)}%</span>`;
+            };
+
+            const handleInputChange = (section, field, value) => {
+                const newData = { ...formData };
+                newData[section][field] = parseFloat(value) || 0;
+                if (!isAwareness && section === 'actuals' && field === 'sales') {
+                    newData.actuals.gp = newData.actuals.sales * 1200; 
+                }
+                setFormData(newData);
+            };
+
+            const handleSave = (status) => {
+                if(status) formData.status = status;
+                onUpdate(formData);
+                setViewMode('summary');
+            };
+
+            return html`
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in-down" onClick=${onClose}>
+                    <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl rounded-sm" onClick=${e => e.stopPropagation()}>
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-start sticky top-0 bg-white z-10">
+                            <div className="w-full">
+                                <div className="flex justify-between">
+                                     <div>
+                                        <span className=${`text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wide mr-2 ${isAwareness?'bg-blue-100 text-blue-700':'bg-emerald-100 text-emerald-700'}`}>{formData.type}</span>
+                                        <h3 className="text-2xl font-light text-slate-900 mt-1">${formData.name}</h3>
+                                     </div>
+                                     <button onClick=${onClose}><${X} size=${20} className="text-slate-500" /></button>
+                                </div>
+                                ${viewMode === 'summary' && html`
+                                    <div className="flex gap-2 mt-4">
+                                         <button onClick=${() => setViewMode('edit_plan')} className="volvo-btn-secondary px-4 py-2 text-xs font-bold">Edit Plan</button>
+                                         <button onClick=${() => setViewMode('log_actuals')} className="volvo-btn-primary px-4 py-2 text-xs font-bold">${isPlanned ? 'Log Actuals' : 'Update Actuals'}</button>
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">Plan ${viewMode==='edit_plan' && '(Editing)'}</h4>
+                                    <div className="space-y-2 text-sm">
+                                        ${viewMode === 'edit_plan' ? html`
+                                            <div className="flex justify-between items-center"><span>Budget</span><input type="number" className="volvo-input w-24 text-right py-1" value=${formData.plan.spend} onChange=${e=>handleInputChange('plan', 'spend', e.target.value)} /></div>
+                                            <div className="flex justify-between items-center"><span>Impressions</span><input type="number" className="volvo-input w-24 text-right py-1" value=${formData.plan.impressions} onChange=${e=>handleInputChange('plan', 'impressions', e.target.value)} /></div>
+                                            <div className="flex justify-between items-center"><span>${isAwareness?'Clicks':'Leads'}</span><input type="number" className="volvo-input w-24 text-right py-1" value=${isAwareness?formData.plan.clicks:formData.plan.leads} onChange=${e=>handleInputChange('plan', isAwareness?'clicks':'leads', e.target.value)} /></div>
+                                        ` : html`
+                                            <div className="flex justify-between"><span>Budget</span><span className="font-bold">£${formatNumber(formData.plan.spend)}</span></div>
+                                            <div className="flex justify-between"><span>Impressions</span><span>${formatNumber(formData.plan.impressions)}</span></div>
+                                            ${isAwareness ? html`<div className="flex justify-between"><span>Target Clicks</span><span>${formatNumber(formData.plan.clicks)}</span></div>` : html`<div className="flex justify-between"><span>Target Leads</span><span>${formatNumber(formData.plan.leads)}</span></div>`}
+                                        `}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">Actuals ${viewMode==='log_actuals' && '(Editing)'}</h4>
+                                    ${viewMode === 'log_actuals' ? html`
+                                        <div className="space-y-2">
+                                            <input type="number" className="volvo-input text-right py-1" placeholder="Spend" value=${formData.actuals.spend} onChange=${e=>setFormData({...formData, actuals:{...formData.actuals, spend:e.target.value}})} />
+                                            <input type="number" className="volvo-input text-right py-1" placeholder="Impressions" value=${formData.actuals.impressions} onChange=${e=>setFormData({...formData, actuals:{...formData.actuals, impressions:e.target.value}})} />
+                                            <input type="number" className="volvo-input text-right py-1" placeholder=${isAwareness?"Clicks":"Leads"} value=${isAwareness?formData.actuals.clicks:formData.actuals.leads} onChange=${e=>{
+                                                const val = e.target.value;
+                                                const key = isAwareness ? 'clicks' : 'leads';
+                                                setFormData({...formData, actuals:{...formData.actuals, [key]:val}});
+                                            }} />
+                                            ${!isAwareness && html`<input type="number" className="volvo-input text-right py-1" placeholder="Sales" value=${formData.actuals.sales} onChange=${e=>{
+                                                const s = e.target.value;
+                                                setFormData({...formData, actuals:{...formData.actuals, sales:s, gp:s*1200}});
+                                            }} />`}
+                                        </div>
+                                    ` : html`
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between"><span>Spend</span><div className="text-right"><span className="font-bold block">£${formatNumber(formData.actuals.spend)}</span>${cv(formData.actuals.spend, formData.plan.spend, true)}</div></div>
+                                            <div className="flex justify-between"><span>Imp.</span><div className="text-right"><span className="font-bold block">${formatNumber(formData.actuals.impressions)}</span>${cv(formData.actuals.impressions, formData.plan.impressions)}</div></div>
+                                            ${!isAwareness && html`<div className="flex justify-between"><span>Sales</span><span className="font-bold">${formData.actuals.sales}</span></div>`}
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                            ${viewMode === 'edit_plan' && html`<button onClick=${() => handleSave()} className="volvo-btn-primary px-4 py-2 text-sm font-medium">Save Plan</button>`}
+                            ${viewMode === 'log_actuals' && html`<button onClick=${() => handleSave(formData.status==='Planned'?'Completed':undefined)} className="volvo-btn-primary px-4 py-2 text-sm font-medium">Save Actuals</button>`}
+                            ${viewMode !== 'summary' && html`<button onClick=${() => setViewMode('summary')} className="volvo-btn-secondary px-4 py-2 text-sm font-medium">Cancel</button>`}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function FunnelAnalysisView({ campaigns }) {
+            const funnelStats = useMemo(() => {
+                const totals = campaigns.filter(c=>c.status==='Completed').reduce((acc, curr) => ({
+                    impressions: acc.impressions + (parseFloat(curr.actuals.impressions)||0),
+                    leads: acc.leads + (parseFloat(curr.actuals.leads)||0) + (parseFloat(curr.actuals.clicks)||0),
+                    sales: acc.sales + (parseFloat(curr.actuals.sales)||0)
+                }), { impressions: 0, leads: 0, sales: 0 });
+
+                return [
+                    { name: 'Impressions', value: totals.impressions, label: 'Market Reach', icon: Globe, fill: '#e5e7eb' },
+                    { name: 'Leads / Clicks', value: totals.leads, label: 'Engagement', icon: MousePointerClick, fill: '#9ca3af' },
+                    { name: 'Orders', value: totals.sales, label: 'Conversions', icon: ShoppingBag, fill: '#171717' }
+                ];
+            }, [campaigns]);
+
+            const getConversionRate = (step, prevStep) => {
+                if (!prevStep || prevStep.value === 0) return 0;
+                return ((step.value / prevStep.value) * 100).toFixed(2);
+            }
+
+            return html`
+                <div className="space-y-8 animate-fade-in-down">
+                    <div className="bg-white p-12 rounded-sm border border-slate-200 shadow-sm overflow-x-auto">
+                        <h3 className="font-bold text-slate-900 mb-12 text-center text-lg uppercase tracking-widest">Customer Conversion Pipeline</h3>
+                        <div className="flex items-center justify-between min-w-[800px] relative">
+                            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -z-0"></div>
+                            ${funnelStats.map((step, index) => {
+                                const prevStep = index > 0 ? funnelStats[index - 1] : null;
+                                const rate = getConversionRate(step, prevStep);
+                                const Icon = step.icon;
+                                return html`
+                                    <div key=${step.name} className="relative z-10 flex flex-col items-center justify-center">
+                                        ${index > 0 ? html`
+                                            <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-32 flex flex-col items-center">
+                                                <div className="bg-slate-900 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md border-2 border-white">${rate}% Conv</div>
+                                                <div className="text-[10px] text-slate-400 text-center mt-2 font-medium">Step Drop-off</div>
+                                            </div>
+                                        ` : null}
+                                        <div className="flex flex-col items-center bg-white p-6 w-48 rounded-sm border border-slate-200 shadow-sm transition-transform hover:-translate-y-1">
+                                            <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-4 text-slate-700"><${Icon} size=${20} strokeWidth=${1.5} /></div>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">${step.label}</p>
+                                            <h4 className="text-2xl font-bold text-slate-900">${formatNumber(step.value)}</h4>
+                                            <p className="text-[10px] text-slate-400 mt-1">${step.name}</p>
+                                        </div>
+                                    </div>
+                                `;
+                            })}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function VisualTimelineView({ campaigns, onSelect }) {
+             const months = useMemo(() => {
+                const grouped = {};
+                const uniqueMonths = [...new Set(campaigns.map(c => c.month))].sort();
+                uniqueMonths.forEach(m => {
+                    grouped[m] = campaigns.filter(c => c.month === m);
+                });
+                return grouped;
+            }, [campaigns]);
+
+            return html`
+                <div className="max-w-6xl mx-auto">
+                    <div className="bg-white p-8 rounded-sm border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="flex items-center gap-2 mb-8"><${Clock} size=${20} className="text-black" /><h3 className="font-bold text-slate-900 text-lg">Visual Schedule</h3></div>
+                        <div className="overflow-x-auto timeline-scroll pb-6">
+                            <div className="flex gap-6 min-w-max">
+                                ${Object.keys(months).length === 0 ? html`<div className="w-full text-center text-slate-400 py-8 font-light">No campaigns available to display.</div>` : null}
+                                ${Object.keys(months).map(month => html`
+                                    <div key=${month} className="w-72 flex-shrink-0 bg-slate-50 rounded-sm p-4 border border-slate-100">
+                                        <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-2"><span className="font-bold text-slate-900">${month}</span><span className="text-[10px] bg-white border border-slate-200 text-slate-500 px-2 py-0.5 rounded-sm">${months[month].length} Items</span></div>
+                                        <div className="space-y-3">
+                                            ${months[month].map(c => html`
+                                                <div key=${c.id} onClick=${() => onSelect(c)} className=${`cursor-pointer p-4 rounded-sm border shadow-sm transition-all hover:shadow-md hover:translate-y-[-2px] bg-white ${c.status === 'Planned' ? 'border-slate-200 border-l-4 border-l-slate-400' : 'border-slate-200 border-l-4 border-l-black'}`}>
+                                                    <div className="flex justify-between items-start mb-2"><span className="text-[10px] font-bold text-slate-900 uppercase tracking-wide">${c.provider}</span><span className=${`text-[10px] font-bold px-1.5 rounded-sm ${c.status === 'Planned' ? 'bg-slate-100 text-slate-600' : 'bg-black text-white'}`}>${c.status==='Planned' ? 'PLAN' : 'DONE'}</span></div>
+                                                    <p className="text-xs text-slate-800 font-bold mb-3 line-clamp-1">${c.name}</p>
+                                                    <div className="flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-50 pt-2"><span>£${c.status==='Planned' ? c.plan.spend : c.actuals.spend}</span></div>
+                                                </div>
+                                            `)}
+                                        </div>
+                                    </div>
+                                `)}
+                                <div className="w-72 flex-shrink-0 border border-dashed border-slate-300 rounded-sm p-4 flex items-center justify-center bg-slate-50/50"><div className="text-center text-slate-400"><${PlusCircle} className="mx-auto mb-2 opacity-50" /><span className="text-xs font-medium uppercase tracking-wide">Future Planning</span></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function PlanningView({ providers, onSave, rates }) {
+            const [formData, setFormData] = useState({
+                month: new Date().toISOString().slice(0, 7), 
+                name: '',
+                type: 'Conversion', 
+                provider: providers[0],
+                plan: { spend: '', impressions: '', clicks: '', leads: '' }
+            });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSave({
+                    month: formData.month,
+                    name: formData.name,
+                    type: formData.type,
+                    provider: formData.provider,
+                    plan: {
+                        spend: parseFloat(formData.plan.spend),
+                        impressions: parseFloat(formData.plan.impressions),
+                        clicks: parseFloat(formData.plan.clicks) || 0,
+                        leads: parseFloat(formData.plan.leads) || 0
+                    }
+                });
+                setFormData({ ...formData, name: '', plan: { spend: '', impressions: '', clicks: '', leads: '' }});
+            };
+
+            return html`
+                <div className="max-w-4xl mx-auto bg-white p-8 rounded-sm border border-slate-100 shadow-sm">
+                     <div className="mb-8"><h3 className="text-xl font-light text-slate-900">Campaign Brief</h3><p className="text-sm text-slate-500 mt-2 font-light">Input strategic plan.</p></div>
+                     <form onSubmit=${handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-2 gap-6">
+                            <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Month</label><input type="month" required className="volvo-input" value=${formData.month} onChange=${e => setFormData({...formData, month: e.target.value})} /></div>
+                            <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Objective</label><select className="volvo-input" value=${formData.type} onChange=${e => setFormData({...formData, type: e.target.value})}><option value="Conversion">Lead Generation (Lower Funnel)</option><option value="Awareness">Brand Awareness (Upper Funnel)</option></select></div>
+                        </div>
+                        <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Campaign Name</label><input type="text" required className="volvo-input" value=${formData.name} onChange=${e => setFormData({...formData, name: e.target.value})} /></div>
+                        <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Partner</label><div className="grid grid-cols-3 gap-3">${providers.map(p => html`<div key=${p} onClick=${() => setFormData({...formData, provider: p})} className=${`cursor-pointer border rounded-sm px-4 py-3 text-sm text-center transition-all ${formData.provider === p ? 'border-black bg-black text-white' : 'border-slate-200 hover:border-slate-400'}`}>${p}</div>`)}</div></div>
+                        <div className="p-6 bg-slate-50 rounded-sm border border-slate-100 grid grid-cols-3 gap-4">
+                            <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Budget (£)</label><input type="number" required className="volvo-input" value=${formData.plan.spend} onChange=${e => setFormData({...formData, plan: {...formData.plan, spend: e.target.value}})} /></div>
+                            <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Impressions</label><input type="number" required className="volvo-input" value=${formData.plan.impressions} onChange=${e => setFormData({...formData, plan: {...formData.plan, impressions: e.target.value}})} /></div>
+                            ${formData.type === 'Awareness' ? html`
+                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Clicks</label><input type="number" required className="volvo-input" value=${formData.plan.clicks} onChange=${e => setFormData({...formData, plan: {...formData.plan, clicks: e.target.value}})} /></div>
+                            ` : html`
+                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Leads</label><input type="number" required className="volvo-input" value=${formData.plan.leads} onChange=${e => setFormData({...formData, plan: {...formData.plan, leads: e.target.value}})} /></div>
+                            `}
+                        </div>
+                        <button type="submit" className="volvo-btn-primary w-full py-4 font-bold flex items-center justify-center gap-2"><${PlusCircle} size=${18} /> Add to Plan</button>
+                     </form>
+                </div>
+            `;
+        }
+
+        // --- MAIN APP ---
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('performance_overview');
+            const [data, setData] = useState({ campaigns: [], config: DEFAULT_CONFIG });
+            const [loading, setLoading] = useState(true);
+            const [currentUser, setCurrentUser] = useState(null);
+            const [selectedCampaign, setSelectedCampaign] = useState(null);
+            const [notification, setNotification] = useState(null);
+            const fileInputRef = useRef(null);
+
+            // Immediate preloader removal logic
+            useEffect(() => {
+                const preloader = document.getElementById('loading-message');
+                if(preloader) preloader.style.display = 'none';
+            }, []);
+
+            // Auth & Data Listener
+            useEffect(() => {
+                if(isOffline) {
+                    setNotification("Running in Offline/Demo Mode");
+                    setData(INITIAL_DATA);
+                    setLoading(false);
+                    return;
+                }
+
+                if (!db || !auth) {
+                    setNotification("Firebase Config Missing/Invalid");
+                    setLoading(false);
+                    return;
+                }
+                const unsubAuth = onAuthStateChanged(auth, (user) => {
+                    setCurrentUser(user);
+                    if (user) {
+                        // Only fetch data if logged in
+                        const unsubData = onSnapshot(doc(db, "marketing", DB_DOC_ID), (docSnap) => {
+                            if (docSnap.exists()) setData(docSnap.data());
+                            else {
+                                setDoc(doc(db, "marketing", DB_DOC_ID), INITIAL_DATA);
+                                setData(INITIAL_DATA);
+                            }
+                            setLoading(false);
+                        }, (err) => {
+                            console.error(err);
+                            setNotification("Data Access Error: " + err.message);
+                            setLoading(false);
+                        });
+                        return () => unsubData();
+                    } else {
+                        setLoading(false);
+                        setData({ campaigns: [], config: DEFAULT_CONFIG }); // Clear local state on logout
+                    }
+                });
+                return () => unsubAuth();
+            }, []);
+
+            const handleLogin = async (email, password) => {
+                if(isOffline) {
+                    // Fake login for demo mode
+                    setCurrentUser({ email: email, uid: 'demo-user' });
+                    return;
+                }
+                await signInWithEmailAndPassword(auth, email, password);
+            };
+
+            const handleLogout = async () => {
+                if(isOffline) {
+                    setCurrentUser(null);
+                    return;
+                }
+                await signOut(auth);
+            };
+
+            const syncToCloud = async (newData) => {
+                setData(newData); // Optimistic UI
+                if (db && !isOffline) {
+                    try {
+                        await setDoc(doc(db, "marketing", DB_DOC_ID), newData);
+                        setNotification("Saved to Cloud.");
+                    } catch(e) {
+                        setNotification("Save Failed: " + e.message);
+                    }
+                    setTimeout(() => setNotification(null), 3000);
+                } else if (isOffline) {
+                    setNotification("Saved Locally (Demo Mode)");
+                    setTimeout(() => setNotification(null), 3000);
+                }
+            };
+
+            const handleUpdate = (updated) => {
+                const newCamps = data.campaigns.map(c => c.id === updated.id ? updated : c);
+                syncToCloud({ ...data, campaigns: newCamps });
+                setSelectedCampaign(null);
+            };
+            
+            const handleConfigSave = (newConfig) => {
+                syncToCloud({ ...data, config: newConfig });
+            }
+
+            const handleAddPlan = (newPlanData) => {
+                // Accepts data from PlanningView form
+                const newC = { id: Date.now(), status: 'Planned', actuals: null, ...newPlanData };
+                const newData = { ...data, campaigns: [...data.campaigns, newC] };
+                syncToCloud(newData);
+                setNotification("Campaign Plan Added");
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            const handleDuplicate = (c) => {
+                const newC = { ...c, id: Date.now(), name: c.name + ' (Copy)', status: 'Planned', actuals: null };
+                const newData = { ...data, campaigns: [...data.campaigns, newC] };
+                syncToCloud(newData);
+                setNotification("Campaign Duplicated.");
+                setTimeout(() => setNotification(null), 3000);
+            };
+            
+            // CSV Export
+            const escapeCSV = (val) => {
+                if (val === null || val === undefined) return '';
+                const str = String(val);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) return `"${str.replace(/"/g, '""')}"`;
+                return str;
+            };
+
+            const handleExportCSV = () => {
+                const rows = data.campaigns.map(c => {
+                    const isCompleted = c.status === 'Completed';
+                    return {
+                        ID: c.id,
+                        Month: c.month,
+                        Name: c.name,
+                        Provider: c.provider,
+                        Type: c.type || 'Conversion',
+                        Status: c.status,
+                        Plan_Spend: c.plan.spend,
+                        Plan_Impressions: c.plan.impressions,
+                        Plan_Clicks: c.plan.clicks || 0,
+                        Plan_Leads: c.plan.leads,
+                        Actual_Spend: isCompleted ? c.actuals.spend : '',
+                        Actual_Impressions: isCompleted ? c.actuals.impressions : '',
+                        Actual_Clicks: isCompleted ? c.actuals.clicks : '',
+                        Actual_Leads: isCompleted ? c.actuals.leads : '',
+                        Actual_Appointments: isCompleted ? c.actuals.appointments : '',
+                        Actual_Sales: isCompleted ? c.actuals.sales : '',
+                        Actual_GP: isCompleted ? c.actuals.gp : ''
+                    };
+                });
+                if (rows.length === 0) { setNotification("No data to export."); setTimeout(() => setNotification(null), 3000); return; }
+                const headers = Object.keys(rows[0]).join(',');
+                const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + rows.map(e => Object.values(e).map(escapeCSV).join(",")).join("\n");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "volvo_campaign_data.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setNotification("Exporting CSV...");
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            const handleImportCSV = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const text = event.target.result;
+                    const lines = text.split('\n');
+                    if (lines.length < 2) return;
+                    const headers = lines[0].split(',').map(h => h.trim());
+                    const newCampaigns = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.replace(/^"|"$/g, '').trim()); 
+                        if (values.length < headers.length) continue;
+                        const rowData = {};
+                        headers.forEach((h, index) => { rowData[h] = values[index]; });
+                        const isCompleted = rowData.Status === 'Completed';
+                        newCampaigns.push({
+                            id: parseInt(rowData.ID) || Date.now() + i,
+                            month: rowData.Month,
+                            name: rowData.Name,
+                            provider: rowData.Provider,
+                            type: rowData.Type || 'Conversion',
+                            market: 'UK',
+                            status: rowData.Status,
+                            plan: { spend: parseFloat(rowData.Plan_Spend)||0, impressions: parseFloat(rowData.Plan_Impressions)||0, clicks: parseFloat(rowData.Plan_Clicks)||0, leads: parseFloat(rowData.Plan_Leads)||0 },
+                            actuals: isCompleted ? { spend: parseFloat(rowData.Actual_Spend)||0, impressions: parseFloat(rowData.Actual_Impressions)||0, clicks: parseFloat(rowData.Actual_Clicks)||0, leads: parseFloat(rowData.Actual_Leads)||0, appointments: parseFloat(rowData.Actual_Appointments)||0, sales: parseFloat(rowData.Actual_Sales)||0, gp: parseFloat(rowData.Actual_GP)||0 } : null
+                        });
+                    }
+                    if (newCampaigns.length > 0) {
+                        syncToCloud({ ...data, campaigns: newCampaigns });
+                        setNotification(`Imported ${newCampaigns.length} campaigns.`);
+                    } else { setNotification("Error: No valid data found."); }
+                    setTimeout(() => setNotification(null), 3000);
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+            };
+
+            // Force rendering LoginScreen if not authenticated and not in initial loading
+            if (!loading && !currentUser) {
+                return html`<${LoginScreen} onLogin=${handleLogin} />`;
+            }
+
+            // Standard Loading Screen (internal react state)
+            if (loading) return html`
+                <div className="flex h-screen items-center justify-center bg-white text-slate-400 gap-3">
+                    <${RefreshCw} class="animate-spin text-slate-300" size=${24} />
+                    <span>Connecting to Database...</span>
+                </div>
+            `;
+
+            return html`
+                <div className="flex h-screen font-sans text-slate-900 bg-white">
+                    <${CampaignDetailsModal} campaign=${selectedCampaign} onClose=${() => setSelectedCampaign(null)} onUpdate=${handleUpdate} rates=${MARKET_RATES} />
+
+                    {/* Sidebar */}
+                    <div className="w-64 bg-white border-r border-slate-100 flex flex-col z-20 flex-shrink-0">
+                        <div className="p-8 pb-4">
+                            <div className="mb-6"><span className="text-xl font-bold tracking-[0.15em] text-black">VOLVO</span><span className="block text-[10px] text-slate-400 font-medium tracking-wide mt-1">MARKETING INTELLIGENCE</span></div>
+                        </div>
+                        <nav className="flex-1 px-4 space-y-0.5 overflow-y-auto">
+                            <${SidebarItem} active=${activeTab === 'performance_overview'} onClick=${() => setActiveTab('performance_overview')} icon=${LayoutDashboard} label="Dashboard" />
+                            <${SidebarItem} active=${activeTab === 'partner_intel'} onClick=${() => setActiveTab('partner_intel')} icon=${Briefcase} label="Partner Intel" />
+                            <div className="my-4 border-t border-slate-100"></div>
+                            <${SidebarItem} active=${activeTab === 'campaign_list'} onClick=${() => setActiveTab('campaign_list')} icon=${List} label="Campaigns" />
+                            <${SidebarItem} active=${activeTab === 'funnel'} onClick=${() => setActiveTab('funnel')} icon=${FilterIcon} label="Funnel Analysis" />
+                            <${SidebarItem} active=${activeTab === 'visual_timeline'} onClick=${() => setActiveTab('visual_timeline')} icon=${Calendar} label="Timeline" />
+                            <${SidebarItem} active=${activeTab === 'comparison'} onClick=${() => setActiveTab('comparison')} icon=${ArrowLeftRight} label="Comparison" />
+                            <div className="my-4 border-t border-slate-100"></div>
+                            <${SidebarItem} active=${activeTab === 'settings'} onClick=${() => setActiveTab('settings')} icon=${Settings} label="Configuration" />
+                            <${SidebarItem} active=${activeTab === 'planning_input'} onClick=${() => setActiveTab('planning_input')} icon=${PlusCircle} label="Add Plan" />
+                        </nav>
+                        <div className="p-6 border-t border-slate-100 space-y-4">
+                            <button onClick=${handleLogout} className="w-full flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-red-600"><${LogOut} size=${14}/> Logout</button>
+                            <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
+                                 ${!isOffline ? html`<${Cloud} size=${12} className="text-emerald-500" />` : html`<${Activity} size=${12} className="text-orange-500" />`}
+                                 ${!isOffline ? "Cloud Sync Active" : "Local Mode"}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main */}
+                    <div className="flex-1 flex flex-col overflow-hidden bg-[#fafafa]">
+                        <header className="bg-white border-b border-slate-100 px-8 py-6 flex justify-between items-center">
+                            <h2 className="text-2xl font-light text-slate-900 tracking-tight">
+                                ${activeTab.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </h2>
+                            <div className="flex gap-3">
+                                <input type="file" ref=${fileInputRef} onChange=${handleImportCSV} accept=".csv" className="hidden" />
+                                <button onClick=${() => fileInputRef.current.click()} className="volvo-btn-secondary px-4 py-2 text-sm font-medium flex items-center gap-2"><${Upload} size=${16}/> Import CSV</button>
+                                <button onClick=${handleExportCSV} className="volvo-btn-secondary px-4 py-2 text-sm font-medium flex items-center gap-2"><${Download} size=${16}/> Export CSV</button>
+                            </div>
+                        </header>
+
+                        <main className="flex-1 overflow-auto p-8">
+                            ${notification ? html`<div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-black text-white px-8 py-3 rounded-sm shadow-xl z-50 animate-fade-in-down">${notification}</div>` : null}
+                            
+                            ${activeTab === 'performance_overview' ? html`<${DashboardView} campaigns=${data.campaigns} config=${data.config} />` : null}
+                            ${activeTab === 'partner_intel' ? html`<${PartnerIntelligenceView} campaigns=${data.campaigns} />` : null}
+                            ${activeTab === 'campaign_list' ? html`<${CampaignList} campaigns=${data.campaigns} onSelect=${setSelectedCampaign} onDuplicate=${handleDuplicate} />` : null}
+                            ${activeTab === 'funnel' ? html`<${FunnelAnalysisView} campaigns=${data.campaigns} />` : null}
+                            ${activeTab === 'visual_timeline' ? html`<${VisualTimelineView} campaigns=${data.campaigns} onSelect=${setSelectedCampaign} />` : null}
+                            ${activeTab === 'comparison' ? html`<${ComparisonView} campaigns=${data.campaigns} />` : null}
+                            ${activeTab === 'settings' ? html`<${SettingsView} config=${data.config} onSave=${handleConfigSave} />` : null}
+                            ${activeTab === 'planning_input' ? html`<${PlanningView} providers=${PROVIDERS} onSave=${handleAddPlan} rates=${MARKET_RATES} />` : null}
+                        </main>
+                    </div>
+                </div>
+            `;
+        }
+
+        try {
+            const root = createRoot(document.getElementById('root'));
+            root.render(html`<${App} />`);
+        } catch(err) {
+            console.error("Mount Error:", err);
+            const el = document.getElementById('loading-message');
+            if(el) el.innerHTML = "Critical Application Error. Check Console.";
+        }
+    </script>
+</body>
+</html>
