@@ -1,0 +1,192 @@
+rules_version = '2';
+
+/**
+ * Firestore Security Rules for Volvo Marketing Intelligence
+ *
+ * DEPLOYMENT INSTRUCTIONS:
+ * 1. Go to Firebase Console: https://console.firebase.google.com
+ * 2. Select your project: volvo-third-party-tracker
+ * 3. Navigate to Firestore Database → Rules
+ * 4. Copy and paste these rules
+ * 5. Click "Publish"
+ *
+ * TESTING:
+ * Use the Rules Playground in Firebase Console to test scenarios
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
+    /**
+     * Check if user is authenticated
+     */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /**
+     * Check if user email is from Volvo domain
+     */
+    function isVolvoUser() {
+      return request.auth.token.email.matches('.*@volvocars.com$')
+          || request.auth.token.email.matches('.*@volvo.com$');
+    }
+
+    /**
+     * Check if request is coming from the same user
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * Validate campaign data structure
+     */
+    function isValidCampaign(data) {
+      return data.keys().hasAll(['name', 'type', 'provider', 'month', 'plan', 'status'])
+          && data.name is string
+          && data.name.size() >= 3
+          && data.name.size() <= 200
+          && data.type in ['Conversion', 'Awareness']
+          && data.provider in ['Carwow', 'Autotrader', 'Leasing.com', 'WhatCar?', 'PistonHeads', 'AutoExpress']
+          && data.status in ['Planned', 'Completed']
+          && data.plan.spend is number
+          && data.plan.spend >= 0
+          && data.plan.spend <= 1000000
+          && data.plan.impressions is number
+          && data.plan.impressions >= 0;
+    }
+
+    /**
+     * Validate config data structure
+     */
+    function isValidConfig(data) {
+      return data.keys().hasAll(['fiscalLabel', 'annualBudget', 'q1', 'q2', 'q3', 'q4'])
+          && data.fiscalLabel is string
+          && data.annualBudget is number
+          && data.annualBudget > 0
+          && data.annualBudget <= 10000000
+          && data.q1 is number && data.q1 >= 0
+          && data.q2 is number && data.q2 >= 0
+          && data.q3 is number && data.q3 >= 0
+          && data.q4 is number && data.q4 >= 0;
+    }
+
+    /**
+     * Rate limiting: max 10 writes per minute per user
+     * Note: This is a basic implementation. For production,
+     * use Cloud Functions or Firebase Extensions for better rate limiting
+     */
+    function isRateLimited() {
+      // This would require additional tracking in Firestore
+      // For now, we'll rely on Firebase quotas
+      return false;
+    }
+
+    // ============================================
+    // DOCUMENT RULES
+    // ============================================
+
+    /**
+     * MARKETING DATA (Current single-document structure)
+     * This is the current data structure using a single document
+     */
+    match /marketing/{docId} {
+      // Read: Any authenticated Volvo user
+      allow read: if isAuthenticated() && isVolvoUser();
+
+      // Write: Authenticated Volvo users with valid data
+      allow create, update: if isAuthenticated()
+                             && isVolvoUser()
+                             && !isRateLimited()
+                             && request.resource.data.keys().hasAll(['campaigns', 'config']);
+
+      // Delete: Only admins (implement admin check if needed)
+      allow delete: if false; // Disable deletes for safety
+    }
+
+    /**
+     * FUTURE: CAMPAIGNS COLLECTION (for when you refactor)
+     * Uncomment when moving to collection-based structure
+     */
+    /*
+    match /campaigns/{campaignId} {
+      allow read: if isAuthenticated() && isVolvoUser();
+
+      allow create: if isAuthenticated()
+                    && isVolvoUser()
+                    && !isRateLimited()
+                    && isValidCampaign(request.resource.data);
+
+      allow update: if isAuthenticated()
+                    && isVolvoUser()
+                    && !isRateLimited()
+                    && isValidCampaign(request.resource.data);
+
+      allow delete: if isAuthenticated() && isVolvoUser();
+    }
+    */
+
+    /**
+     * FUTURE: PARTNERS COLLECTION
+     */
+    /*
+    match /partners/{partnerId} {
+      allow read: if isAuthenticated() && isVolvoUser();
+
+      // Only allow updates to average metrics, not core partner data
+      allow update: if isAuthenticated()
+                    && isVolvoUser()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['averageMetrics', 'lastUpdated']);
+
+      allow create, delete: if false; // Partners should be managed separately
+    }
+    */
+
+    /**
+     * SETTINGS/CONFIG
+     */
+    /*
+    match /settings/{docId} {
+      allow read: if isAuthenticated() && isVolvoUser();
+
+      allow update: if isAuthenticated()
+                    && isVolvoUser()
+                    && isValidConfig(request.resource.data);
+
+      allow create, delete: if false;
+    }
+    */
+
+    /**
+     * USER PREFERENCES (for future use)
+     */
+    /*
+    match /users/{userId}/preferences/{docId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+    */
+
+    /**
+     * AUDIT LOGS (read-only for users)
+     */
+    /*
+    match /audit_logs/{logId} {
+      allow read: if isAuthenticated() && isVolvoUser();
+      allow write: if false; // Only Cloud Functions can write audit logs
+    }
+    */
+
+    // ============================================
+    // DENY ALL OTHER PATHS
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
