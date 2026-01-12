@@ -292,70 +292,251 @@
             `;
         }
 
+        function FilterBar({ campaignType, setCampaignType, dataSource, setDataSource, status, setStatus }) {
+            return html`
+                <div className="bg-slate-50 p-4 rounded-sm border border-slate-200 flex gap-6 items-center flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500 uppercase">Type:</span>
+                        <div className="flex gap-1">
+                            <button onClick=${() => setCampaignType('All')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${campaignType === 'All' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>All</button>
+                            <button onClick=${() => setCampaignType('Awareness')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${campaignType === 'Awareness' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>Awareness</button>
+                            <button onClick=${() => setCampaignType('Conversion')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${campaignType === 'Conversion' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>Conversion</button>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500 uppercase">Data:</span>
+                        <div className="flex gap-1">
+                            <button onClick=${() => setDataSource('Actual')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${dataSource === 'Actual' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>Actual</button>
+                            <button onClick=${() => setDataSource('Planned')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${dataSource === 'Planned' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>Planned</button>
+                            <button onClick=${() => setDataSource('Both')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${dataSource === 'Both' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>Both</button>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500 uppercase">Status:</span>
+                        <div className="flex gap-1">
+                            <button onClick=${() => setStatus('All')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${status === 'All' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>All</button>
+                            <button onClick=${() => setStatus('Completed')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${status === 'Completed' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>Completed</button>
+                            <button onClick=${() => setStatus('Planned')} className=${`px-3 py-1.5 text-xs font-bold rounded-sm transition-all ${status === 'Planned' ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>Planned</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         function PartnerIntelligenceView({ campaigns }) {
-             const completed = campaigns.filter(c => c.status === 'Completed' && c.type === 'Conversion');
+             const [campaignType, setCampaignType] = useState('All');
+             const [dataSource, setDataSource] = useState('Actual');
+             const [status, setStatus] = useState('All');
+
              const data = useMemo(() => {
+                 // Filter campaigns based on selected filters
+                 let filtered = campaigns;
+                 if (campaignType !== 'All') filtered = filtered.filter(c => c.type === campaignType);
+                 if (status !== 'All') filtered = filtered.filter(c => c.status === status);
+
                  const map = {};
-                 completed.forEach(c => {
-                     if (!map[c.provider]) map[c.provider] = { provider: c.provider, spend: 0, leads: 0, sales: 0, gp: 0 };
-                     map[c.provider].spend += c.actuals.spend;
-                     map[c.provider].leads += c.actuals.leads;
-                     map[c.provider].sales += c.actuals.sales;
-                     map[c.provider].gp += c.actuals.gp;
+                 filtered.forEach(c => {
+                     if (!map[c.provider]) map[c.provider] = {
+                         provider: c.provider,
+                         spend: 0, impressions: 0, clicks: 0, leads: 0, sales: 0, gp: 0
+                     };
+
+                     // Get data based on dataSource filter
+                     let source;
+                     if (dataSource === 'Actual' && c.status === 'Completed') {
+                         source = c.actuals;
+                     } else if (dataSource === 'Planned' || c.status === 'Planned') {
+                         source = c.plan;
+                     } else if (dataSource === 'Both') {
+                         source = c.status === 'Completed' ? c.actuals : c.plan;
+                     } else {
+                         return; // Skip if no matching data source
+                     }
+
+                     if (source) {
+                         map[c.provider].spend += parseFloat(source.spend) || 0;
+                         map[c.provider].impressions += parseFloat(source.impressions) || 0;
+                         map[c.provider].clicks += parseFloat(source.clicks) || 0;
+                         map[c.provider].leads += parseFloat(source.leads) || 0;
+                         map[c.provider].sales += parseFloat(source.sales) || 0;
+                         map[c.provider].gp += parseFloat(source.gp) || 0;
+                     }
                  });
+
                  return Object.values(map).map(p => ({
                      ...p,
+                     // Conversion metrics
                      cpa: p.sales > 0 ? p.spend / p.sales : 0,
                      roas: p.spend > 0 ? p.gp / p.spend : 0,
                      cpl: p.leads > 0 ? p.spend / p.leads : 0,
-                     lqi: p.leads > 0 ? (p.sales / p.leads) * 100 : 0
-                 })).sort((a,b) => b.roas - a.roas);
-             }, [completed]);
+                     lqi: p.leads > 0 ? (p.sales / p.leads) * 100 : 0,
+                     // Awareness metrics
+                     cpm: p.impressions > 0 ? (p.spend / p.impressions) * 1000 : 0,
+                     ctr: p.impressions > 0 ? (p.clicks / p.impressions) * 100 : 0,
+                     cpc: p.clicks > 0 ? p.spend / p.clicks : 0
+                 })).sort((a,b) => b.spend - a.spend);
+             }, [campaigns, campaignType, dataSource, status]);
+
+             const isAwarenessView = campaignType === 'Awareness';
+             const isConversionView = campaignType === 'Conversion';
 
              return html`
-                 <div className="max-w-6xl mx-auto space-y-8 animate-fade-in-down">
+                 <div className="max-w-6xl mx-auto space-y-6 animate-fade-in-down">
+                    <${FilterBar}
+                        campaignType=${campaignType} setCampaignType=${setCampaignType}
+                        dataSource=${dataSource} setDataSource=${setDataSource}
+                        status=${status} setStatus=${setStatus}
+                    />
+
                     <div className="bg-white p-8 rounded-sm border border-slate-200 shadow-sm">
-                        <div className="flex items-center gap-2 mb-6"><${Briefcase} size=${20} className="text-black"/><h3 className="font-bold text-slate-900 text-lg">Partner Intelligence Matrix (Conversion Only)</h3></div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th className="px-6 py-4">Partner</th><th className="px-6 py-4 text-right">Total Spend</th><th className="px-6 py-4 text-right">Leads</th><th className="px-6 py-4 text-right">Cost Per Lead</th><th className="px-6 py-4 text-right">Sales</th><th className="px-6 py-4 text-right">Conv. Rate (LQI)</th><th className="px-6 py-4 text-right">CPA</th><th className="px-6 py-4 text-right">ROAS</th></tr></thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    ${data.map((row, idx) => html`
-                                        <tr key=${idx} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-6 py-4 font-bold text-slate-900">${row.provider}</td>
-                                            <td className="px-6 py-4 text-right text-slate-600">${formatCurrency(row.spend)}</td>
-                                            <td className="px-6 py-4 text-right text-slate-600">${formatNumber(row.leads)}</td>
-                                            <td className="px-6 py-4 text-right text-slate-600">${formatCurrency(row.cpl)}</td>
-                                            <td className="px-6 py-4 text-right font-bold text-slate-900">${row.sales}</td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className=${`px-2 py-1 rounded text-[10px] font-bold ${row.lqi > 10 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>${row.lqi.toFixed(1)}%</span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-medium">${formatCurrency(row.cpa)}</td>
-                                            <td className="px-6 py-4 text-right font-bold text-emerald-600">${row.roas.toFixed(2)}x</td>
-                                        </tr>
-                                    `)}
-                                </tbody>
-                            </table>
+                        <div className="flex items-center gap-2 mb-6">
+                            <${Briefcase} size=${20} className="text-black"/>
+                            <h3 className="font-bold text-slate-900 text-lg">Partner Intelligence Matrix</h3>
+                            <span className="text-xs text-slate-400 ml-2">(${campaignType} ${campaignType !== 'All' ? 'Campaigns' : ''} - ${dataSource} Data)</span>
                         </div>
+
+                        ${data.length === 0 ? html`
+                            <div className="text-center py-12 text-slate-400">
+                                <p className="font-medium">No data available for selected filters</p>
+                                <p className="text-xs mt-2">Try adjusting your filter selection</p>
+                            </div>
+                        ` : html`
+                            <div className="overflow-x-auto">
+                                ${isAwarenessView || campaignType === 'All' ? html`
+                                    <table className="w-full text-sm text-left mb-8">
+                                        <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-6 py-4">Partner</th>
+                                                <th className="px-6 py-4 text-right">Total Spend</th>
+                                                <th className="px-6 py-4 text-right">Impressions</th>
+                                                <th className="px-6 py-4 text-right">CPM</th>
+                                                <th className="px-6 py-4 text-right">Clicks</th>
+                                                <th className="px-6 py-4 text-right">CTR</th>
+                                                <th className="px-6 py-4 text-right">CPC</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            ${data.filter(p => p.impressions > 0 || campaignType === 'All').map((row, idx) => html`
+                                                <tr key=${idx} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-4 font-bold text-slate-900">${row.provider}</td>
+                                                    <td className="px-6 py-4 text-right text-slate-600">${formatCurrency(row.spend)}</td>
+                                                    <td className="px-6 py-4 text-right text-slate-600">${formatNumber(row.impressions)}</td>
+                                                    <td className="px-6 py-4 text-right text-slate-600">${formatCurrency(row.cpm)}</td>
+                                                    <td className="px-6 py-4 text-right text-slate-600">${formatNumber(row.clicks)}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <span className=${`px-2 py-1 rounded text-[10px] font-bold ${row.ctr > 2 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>${row.ctr.toFixed(2)}%</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right font-medium">${formatCurrency(row.cpc)}</td>
+                                                </tr>
+                                            `)}
+                                        </tbody>
+                                    </table>
+                                ` : null}
+
+                                ${isConversionView || campaignType === 'All' ? html`
+                                    ${campaignType === 'All' && isAwarenessView ? html`<div className="my-8 border-t border-slate-200"></div>` : null}
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-6 py-4">Partner</th>
+                                                <th className="px-6 py-4 text-right">Total Spend</th>
+                                                <th className="px-6 py-4 text-right">Leads</th>
+                                                <th className="px-6 py-4 text-right">Cost Per Lead</th>
+                                                <th className="px-6 py-4 text-right">Sales</th>
+                                                <th className="px-6 py-4 text-right">Conv. Rate (LQI)</th>
+                                                <th className="px-6 py-4 text-right">CPA</th>
+                                                <th className="px-6 py-4 text-right">ROAS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            ${data.filter(p => p.leads > 0 || campaignType === 'All').map((row, idx) => html`
+                                                <tr key=${idx} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-4 font-bold text-slate-900">${row.provider}</td>
+                                                    <td className="px-6 py-4 text-right text-slate-600">${formatCurrency(row.spend)}</td>
+                                                    <td className="px-6 py-4 text-right text-slate-600">${formatNumber(row.leads)}</td>
+                                                    <td className="px-6 py-4 text-right text-slate-600">${formatCurrency(row.cpl)}</td>
+                                                    <td className="px-6 py-4 text-right font-bold text-slate-900">${row.sales}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <span className=${`px-2 py-1 rounded text-[10px] font-bold ${row.lqi > 10 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>${row.lqi.toFixed(1)}%</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right font-medium">${formatCurrency(row.cpa)}</td>
+                                                    <td className="px-6 py-4 text-right font-bold text-emerald-600">${row.roas.toFixed(2)}x</td>
+                                                </tr>
+                                            `)}
+                                        </tbody>
+                                    </table>
+                                ` : null}
+                            </div>
+                        `}
                     </div>
                  </div>
              `;
         }
 
         function DashboardView({ campaigns, config }) {
+            const [campaignType, setCampaignType] = useState('All');
+            const [dataSource, setDataSource] = useState('Actual');
+            const [status, setStatus] = useState('All');
+
             const completed = campaigns.filter(c => c.status === 'Completed');
             const planned = campaigns.filter(c => c.status === 'Planned');
+
             const stats = useMemo(() => {
-                let spend=0, sales=0, gp=0;
+                // Filter campaigns based on selected filters
+                let filtered = campaigns;
+                if (campaignType !== 'All') filtered = filtered.filter(c => c.type === campaignType);
+                if (status !== 'All') filtered = filtered.filter(c => c.status === status);
+
+                let spend=0, sales=0, leads=0, gp=0, impressions=0, clicks=0;
                 const chartData = {};
-                completed.forEach(c => {
-                    spend += parseFloat(c.actuals.spend)||0; sales += parseFloat(c.actuals.sales)||0; gp += parseFloat(c.actuals.gp)||0;
-                    if(!chartData[c.provider]) chartData[c.provider] = { provider: c.provider, spend: 0, gp: 0 };
-                    chartData[c.provider].spend += parseFloat(c.actuals.spend)||0; chartData[c.provider].gp += parseFloat(c.actuals.gp)||0;
+
+                filtered.forEach(c => {
+                    let source;
+                    if (dataSource === 'Actual' && c.status === 'Completed') {
+                        source = c.actuals;
+                    } else if (dataSource === 'Planned' || c.status === 'Planned') {
+                        source = c.plan;
+                    } else if (dataSource === 'Both') {
+                        source = c.status === 'Completed' ? c.actuals : c.plan;
+                    }
+
+                    if (source) {
+                        spend += parseFloat(source.spend)||0;
+                        sales += parseFloat(source.sales)||0;
+                        leads += parseFloat(source.leads)||0;
+                        gp += parseFloat(source.gp)||0;
+                        impressions += parseFloat(source.impressions)||0;
+                        clicks += parseFloat(source.clicks)||0;
+
+                        if(!chartData[c.provider]) chartData[c.provider] = { provider: c.provider, spend: 0, gp: 0, impressions: 0, clicks: 0 };
+                        chartData[c.provider].spend += parseFloat(source.spend)||0;
+                        chartData[c.provider].gp += parseFloat(source.gp)||0;
+                        chartData[c.provider].impressions += parseFloat(source.impressions)||0;
+                        chartData[c.provider].clicks += parseFloat(source.clicks)||0;
+                    }
                 });
-                const chartArray = Object.values(chartData).map(d => ({ ...d, roas: d.spend>0 ? d.gp/d.spend : 0 }));
-                return { spend, sales, roas: spend>0 ? (gp/spend).toFixed(2) : 0, cpa: sales>0 ? (spend/sales).toFixed(0) : 0, chartArray };
-            }, [completed]);
+
+                const chartArray = Object.values(chartData).map(d => ({
+                    ...d,
+                    roas: d.spend>0 ? d.gp/d.spend : 0,
+                    cpm: d.impressions>0 ? (d.spend/d.impressions)*1000 : 0,
+                    ctr: d.impressions>0 ? (d.clicks/d.impressions)*100 : 0
+                }));
+
+                return {
+                    spend,
+                    sales,
+                    leads,
+                    impressions,
+                    clicks,
+                    roas: spend>0 ? (gp/spend).toFixed(2) : 0,
+                    cpa: sales>0 ? (spend/sales).toFixed(0) : 0,
+                    cpl: leads>0 ? (spend/leads).toFixed(0) : 0,
+                    cpm: impressions>0 ? ((spend/impressions)*1000).toFixed(2) : 0,
+                    ctr: impressions>0 ? ((clicks/impressions)*100).toFixed(2) : 0,
+                    chartArray
+                };
+            }, [campaigns, campaignType, dataSource, status]);
 
             const budgetStats = useMemo(() => {
                 const totalSpent = completed.reduce((acc, c) => acc + (parseFloat(c.actuals.spend)||0), 0);
@@ -373,23 +554,45 @@
                 alert("Report copied!");
             };
 
+            const isAwarenessView = campaignType === 'Awareness';
+            const isConversionView = campaignType === 'Conversion';
+
             return html`
                 <div className="space-y-8 animate-fade-in-down">
+                    <${FilterBar}
+                        campaignType=${campaignType} setCampaignType=${setCampaignType}
+                        dataSource=${dataSource} setDataSource=${setDataSource}
+                        status=${status} setStatus=${setStatus}
+                    />
+
                     <div className="flex justify-end"><button onClick=${copyReport} className="volvo-btn-secondary px-4 py-2 text-xs font-bold flex items-center gap-2"><${Copy} size=${12}/> Copy Summary</button></div>
                     <div className="bg-white p-8 rounded-sm border border-slate-200 shadow-sm">
                         <div className="flex justify-between items-start mb-6"><div><h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-1">Annual Budget Pacing</h4><p className="text-xs text-slate-500">${config.fiscalLabel}</p></div><div className="text-right"><span className="text-3xl font-light text-slate-900">${formatCurrency(config.annualBudget)}</span><p className="text-[10px] text-slate-400 uppercase font-bold mt-1">Total Budget</p></div></div>
                         <div className="relative w-full h-4 bg-slate-100 rounded-full overflow-hidden mb-4"><div className="absolute top-0 left-0 h-full bg-slate-800 z-20" style=${{width: `${Math.min(budgetStats.spentPct, 100)}%`}}></div><div className="absolute top-0 left-0 h-full bg-slate-300 z-10" style=${{width: `${Math.min(budgetStats.committedPct, 100)}%`}}></div></div>
                         <div className="grid grid-cols-3 gap-4 text-sm"><div><div className="flex items-center gap-2 mb-1"><div className="w-2 h-2 rounded-full bg-slate-800"></div><span className="font-bold">Actual Spent</span></div><p className="text-slate-600 pl-4">${formatCurrency(budgetStats.totalSpent)}</p></div><div><div className="flex items-center gap-2 mb-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div><span className="font-bold">Planned Future</span></div><p className="text-slate-600 pl-4">${formatCurrency(budgetStats.totalPlanned)}</p></div><div><div className="flex items-center gap-2 mb-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="font-bold text-emerald-700">Remaining</span></div><p className="text-emerald-600 pl-4 font-bold">${formatCurrency(budgetStats.remaining)}</p></div></div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <${VolvoCard} title="Total Investment (YTD)" value=${formatCurrency(stats.spend)} />
-                        <${VolvoCard} title="Total Orders (YTD)" value=${stats.sales} />
-                        <${VolvoCard} title="Blended ROAS" value=${`${stats.roas}x`} trend=${stats.roas > 3.5} />
-                        <${VolvoCard} title="Actual CPA" value=${formatCurrency(stats.cpa)} />
-                    </div>
+
+                    ${isConversionView || campaignType === 'All' ? html`
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <${VolvoCard} title="Total Investment" value=${formatCurrency(stats.spend)} />
+                            <${VolvoCard} title="Total Orders" value=${stats.sales} />
+                            <${VolvoCard} title="Blended ROAS" value=${`${stats.roas}x`} trend=${stats.roas > 3.5} />
+                            <${VolvoCard} title="Actual CPA" value=${formatCurrency(stats.cpa)} />
+                        </div>
+                    ` : null}
+
+                    ${isAwarenessView || campaignType === 'All' ? html`
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <${VolvoCard} title="Total Impressions" value=${formatNumber(stats.impressions)} />
+                            <${VolvoCard} title="Total Clicks" value=${formatNumber(stats.clicks)} />
+                            <${VolvoCard} title="Average CPM" value=${formatCurrency(stats.cpm)} />
+                            <${VolvoCard} title="Overall CTR" value=${`${stats.ctr}%`} trend=${stats.ctr > 2} />
+                        </div>
+                    ` : null}
+
                     <div className="bg-white p-8 rounded-sm border border-slate-200 shadow-sm">
                         <div className="flex justify-between items-center mb-8"><h3 className="font-bold text-slate-900">Partner Efficiency</h3></div>
-                        <div className="h-96 w-full"><${ResponsiveContainer} width="100%" height="100%"><${ComposedChart} data=${stats.chartArray}><${CartesianGrid} stroke="#f1f5f9" vertical=${false} /><${XAxis} dataKey="provider" tick=${{fontSize: 12, fill: '#64748b'}} axisLine=${false} tickLine=${false} /><${YAxis} yAxisId="left" orientation="left" stroke="transparent" /><${YAxis} yAxisId="right" orientation="right" stroke="transparent" /><${Tooltip} contentStyle=${{ borderRadius: '2px', border: '1px solid #e2e8f0', boxShadow: 'none' }} /><${Bar} yAxisId="left" dataKey="spend" name="Spend (£)" fill="#e5e7eb" barSize=${48} /><${Line} yAxisId="right" type="monotone" dataKey="roas" name="ROAS" stroke="#171717" strokeWidth=${2} dot=${{r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2}} /></${ComposedChart}></${ResponsiveContainer}></div>
+                        <div className="h-96 w-full"><${ResponsiveContainer} width="100%" height="100%"><${ComposedChart} data=${stats.chartArray}><${CartesianGrid} stroke="#f1f5f9" vertical=${false} /><${XAxis} dataKey="provider" tick=${{fontSize: 12, fill: '#64748b'}} axisLine=${false} tickLine=${false} /><${YAxis} yAxisId="left" orientation="left" stroke="transparent" /><${YAxis} yAxisId="right" orientation="right" stroke="transparent" /><${Tooltip} contentStyle=${{ borderRadius: '2px', border: '1px solid #e2e8f0', boxShadow: 'none' }} /><${Bar} yAxisId="left" dataKey="spend" name="Spend (£)" fill="#e5e7eb" barSize=${48} /><${Line} yAxisId="right" type="monotone" dataKey=${isAwarenessView ? "ctr" : "roas"} name=${isAwarenessView ? "CTR %" : "ROAS"} stroke="#171717" strokeWidth=${2} dot=${{r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2}} /></${ComposedChart}></${ResponsiveContainer}></div>
                     </div>
                 </div>
             `;
@@ -599,19 +802,56 @@
         }
 
         function FunnelAnalysisView({ campaigns }) {
-            const funnelStats = useMemo(() => {
-                const totals = campaigns.filter(c=>c.status==='Completed').reduce((acc, curr) => ({
-                    impressions: acc.impressions + (parseFloat(curr.actuals.impressions)||0),
-                    leads: acc.leads + (parseFloat(curr.actuals.leads)||0) + (parseFloat(curr.actuals.clicks)||0),
-                    sales: acc.sales + (parseFloat(curr.actuals.sales)||0)
-                }), { impressions: 0, leads: 0, sales: 0 });
+            const [campaignType, setCampaignType] = useState('All');
+            const [dataSource, setDataSource] = useState('Actual');
+            const [status, setStatus] = useState('All');
 
-                return [
-                    { name: 'Impressions', value: totals.impressions, label: 'Market Reach', icon: Globe, fill: '#e5e7eb' },
-                    { name: 'Leads / Clicks', value: totals.leads, label: 'Engagement', icon: MousePointerClick, fill: '#9ca3af' },
-                    { name: 'Orders', value: totals.sales, label: 'Conversions', icon: ShoppingBag, fill: '#171717' }
-                ];
-            }, [campaigns]);
+            const funnelStats = useMemo(() => {
+                // Filter campaigns based on selected filters
+                let filtered = campaigns;
+                if (campaignType !== 'All') filtered = filtered.filter(c => c.type === campaignType);
+                if (status !== 'All') filtered = filtered.filter(c => c.status === status);
+
+                const totals = filtered.reduce((acc, curr) => {
+                    let source;
+                    if (dataSource === 'Actual' && curr.status === 'Completed') {
+                        source = curr.actuals;
+                    } else if (dataSource === 'Planned' || curr.status === 'Planned') {
+                        source = curr.plan;
+                    } else if (dataSource === 'Both') {
+                        source = curr.status === 'Completed' ? curr.actuals : curr.plan;
+                    }
+
+                    if (source) {
+                        acc.impressions += (parseFloat(source.impressions)||0);
+                        acc.clicks += (parseFloat(source.clicks)||0);
+                        acc.leads += (parseFloat(source.leads)||0);
+                        acc.sales += (parseFloat(source.sales)||0);
+                    }
+                    return acc;
+                }, { impressions: 0, clicks: 0, leads: 0, sales: 0 });
+
+                // Build funnel based on campaign type
+                if (campaignType === 'Awareness') {
+                    return [
+                        { name: 'Impressions', value: totals.impressions, label: 'Market Reach', icon: Globe, fill: '#e5e7eb' },
+                        { name: 'Clicks', value: totals.clicks, label: 'Engagement', icon: MousePointerClick, fill: '#9ca3af' }
+                    ];
+                } else if (campaignType === 'Conversion') {
+                    return [
+                        { name: 'Impressions', value: totals.impressions, label: 'Market Reach', icon: Globe, fill: '#e5e7eb' },
+                        { name: 'Leads', value: totals.leads, label: 'Interest', icon: MousePointerClick, fill: '#9ca3af' },
+                        { name: 'Orders', value: totals.sales, label: 'Conversions', icon: ShoppingBag, fill: '#171717' }
+                    ];
+                } else {
+                    // All campaigns - combined funnel
+                    return [
+                        { name: 'Impressions', value: totals.impressions, label: 'Market Reach', icon: Globe, fill: '#e5e7eb' },
+                        { name: 'Leads / Clicks', value: totals.leads + totals.clicks, label: 'Engagement', icon: MousePointerClick, fill: '#9ca3af' },
+                        { name: 'Orders', value: totals.sales, label: 'Conversions', icon: ShoppingBag, fill: '#171717' }
+                    ];
+                }
+            }, [campaigns, campaignType, dataSource, status]);
 
             const getConversionRate = (step, prevStep) => {
                 if (!prevStep || prevStep.value === 0) return 0;
@@ -620,6 +860,12 @@
 
             return html`
                 <div className="space-y-8 animate-fade-in-down">
+                    <${FilterBar}
+                        campaignType=${campaignType} setCampaignType=${setCampaignType}
+                        dataSource=${dataSource} setDataSource=${setDataSource}
+                        status=${status} setStatus=${setStatus}
+                    />
+
                     <div className="bg-white p-12 rounded-sm border border-slate-200 shadow-sm overflow-x-auto">
                         <h3 className="font-bold text-slate-900 mb-12 text-center text-lg uppercase tracking-widest">Customer Conversion Pipeline</h3>
                         <div className="flex items-center justify-between min-w-[800px] relative">
