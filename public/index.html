@@ -127,6 +127,11 @@
         const Lock = getIcon('Lock');
         const LogIn = getIcon('LogIn');
         const LogOut = getIcon('LogOut');
+        const CheckCircle2 = getIcon('CheckCircle2');
+        const CheckCircle = getIcon('CheckCircle');
+        const AlertTriangle = getIcon('AlertTriangle');
+        const AlertOctagon = getIcon('AlertOctagon');
+        const Info = getIcon('Info');
 
         // --- RECHARTS WRAPPER ---
         const RechartsLib = Recharts.default || Recharts;
@@ -936,14 +941,144 @@
             `;
         }
         
-        function PlanningView({ providers, onSave, rates }) {
+        function PlanningView({ providers, onSave, rates, campaigns }) {
             const [formData, setFormData] = useState({
-                month: new Date().toISOString().slice(0, 7), 
+                month: new Date().toISOString().slice(0, 7),
                 name: '',
-                type: 'Conversion', 
+                type: 'Conversion',
                 provider: providers[0],
                 plan: { spend: '', impressions: '', clicks: '', leads: '' }
             });
+
+            // Calculate benchmarks and recommendations
+            const analysis = useMemo(() => {
+                if (!formData.plan.spend || !formData.plan.impressions) return null;
+
+                const spend = parseFloat(formData.plan.spend);
+                const impressions = parseFloat(formData.plan.impressions);
+                const engagements = formData.type === 'Awareness'
+                    ? parseFloat(formData.plan.clicks) || 0
+                    : parseFloat(formData.plan.leads) || 0;
+
+                if (spend <= 0 || impressions <= 0) return null;
+
+                // Calculate planned metrics
+                const cpm = (spend / impressions) * 1000;
+                const cpe = engagements > 0 ? spend / engagements : 0; // Cost per engagement (CPL or CPC)
+                const rate = impressions > 0 ? (engagements / impressions) * 100 : 0; // CTR or Lead Rate
+
+                // Get historical data for same partner
+                const partnerHistory = campaigns.filter(c =>
+                    c.provider === formData.provider &&
+                    c.status === 'Completed' &&
+                    c.type === formData.type
+                );
+
+                // Get historical data for all partners
+                const allHistory = campaigns.filter(c =>
+                    c.status === 'Completed' &&
+                    c.type === formData.type
+                );
+
+                const calcAvg = (camps, metric) => {
+                    if (camps.length === 0) return null;
+                    const sum = camps.reduce((acc, c) => {
+                        if (metric === 'cpm') {
+                            return acc + ((c.actuals.spend / c.actuals.impressions) * 1000);
+                        } else if (metric === 'cpe') {
+                            const eng = formData.type === 'Awareness' ? c.actuals.clicks : c.actuals.leads;
+                            return acc + (eng > 0 ? c.actuals.spend / eng : 0);
+                        } else if (metric === 'rate') {
+                            const eng = formData.type === 'Awareness' ? c.actuals.clicks : c.actuals.leads;
+                            return acc + ((eng / c.actuals.impressions) * 100);
+                        } else if (metric === 'roas') {
+                            return acc + (c.actuals.spend > 0 ? c.actuals.gp / c.actuals.spend : 0);
+                        }
+                        return acc;
+                    }, 0);
+                    return sum / camps.length;
+                };
+
+                const partnerAvgCPM = calcAvg(partnerHistory, 'cpm');
+                const allAvgCPM = calcAvg(allHistory, 'cpm');
+                const partnerAvgCPE = calcAvg(partnerHistory, 'cpe');
+                const allAvgCPE = calcAvg(allHistory, 'cpe');
+                const partnerAvgRate = calcAvg(partnerHistory, 'rate');
+                const allAvgRate = calcAvg(allHistory, 'rate');
+
+                // Scoring logic
+                const scores = [];
+                let reasons = [];
+
+                // CPM Score (lower is better)
+                if (partnerAvgCPM) {
+                    const cpmDiff = ((cpm - partnerAvgCPM) / partnerAvgCPM) * 100;
+                    if (cpmDiff <= -15) { scores.push(4); reasons.push(`CPM 15%+ better than ${formData.provider} average`); }
+                    else if (cpmDiff <= 0) { scores.push(3); reasons.push(`CPM matches ${formData.provider} average`); }
+                    else if (cpmDiff <= 15) { scores.push(2); reasons.push(`CPM slightly higher than ${formData.provider} average`); }
+                    else { scores.push(1); reasons.push(`CPM significantly higher than ${formData.provider} average`); }
+                } else if (allAvgCPM) {
+                    const cpmDiff = ((cpm - allAvgCPM) / allAvgCPM) * 100;
+                    if (cpmDiff <= -15) { scores.push(4); }
+                    else if (cpmDiff <= 0) { scores.push(3); }
+                    else if (cpmDiff <= 15) { scores.push(2); }
+                    else { scores.push(1); }
+                }
+
+                // Cost per Engagement Score (lower is better)
+                if (engagements > 0) {
+                    if (partnerAvgCPE) {
+                        const cpeDiff = ((cpe - partnerAvgCPE) / partnerAvgCPE) * 100;
+                        if (cpeDiff <= -15) { scores.push(4); reasons.push(`Cost per ${formData.type === 'Awareness' ? 'click' : 'lead'} 15%+ better than ${formData.provider}`); }
+                        else if (cpeDiff <= 0) { scores.push(3); reasons.push(`Cost per ${formData.type === 'Awareness' ? 'click' : 'lead'} competitive`); }
+                        else if (cpeDiff <= 20) { scores.push(2); reasons.push(`Cost per ${formData.type === 'Awareness' ? 'click' : 'lead'} slightly high`); }
+                        else { scores.push(1); reasons.push(`Cost per ${formData.type === 'Awareness' ? 'click' : 'lead'} significantly high`); }
+                    }
+
+                    // Engagement Rate Score (higher is better)
+                    if (partnerAvgRate) {
+                        const rateDiff = ((rate - partnerAvgRate) / partnerAvgRate) * 100;
+                        if (rateDiff >= 15) { scores.push(4); reasons.push(`${formData.type === 'Awareness' ? 'CTR' : 'Lead rate'} 15%+ better than historical`); }
+                        else if (rateDiff >= 0) { scores.push(3); reasons.push(`${formData.type === 'Awareness' ? 'CTR' : 'Lead rate'} acceptable`); }
+                        else if (rateDiff >= -15) { scores.push(2); reasons.push(`${formData.type === 'Awareness' ? 'CTR' : 'Lead rate'} below average`); }
+                        else { scores.push(1); reasons.push(`${formData.type === 'Awareness' ? 'CTR' : 'Lead rate'} significantly below average`); }
+                    }
+                }
+
+                // Calculate overall score
+                const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 2.5;
+
+                let recommendation, color, bgColor, icon;
+                if (avgScore >= 3.5) {
+                    recommendation = 'Excellent Plan';
+                    color = 'text-emerald-800';
+                    bgColor = 'bg-emerald-100 border-emerald-300';
+                    icon = 'CheckCircle2';
+                } else if (avgScore >= 2.75) {
+                    recommendation = 'Good Plan';
+                    color = 'text-green-800';
+                    bgColor = 'bg-green-100 border-green-300';
+                    icon = 'CheckCircle';
+                } else if (avgScore >= 2) {
+                    recommendation = 'Review Carefully';
+                    color = 'text-amber-800';
+                    bgColor = 'bg-amber-100 border-amber-300';
+                    icon = 'AlertTriangle';
+                } else {
+                    recommendation = 'Consider Alternatives';
+                    color = 'text-red-800';
+                    bgColor = 'bg-red-100 border-red-300';
+                    icon = 'AlertOctagon';
+                }
+
+                return {
+                    cpm, cpe, rate, recommendation, color, bgColor, icon, reasons,
+                    partnerHistory: partnerHistory.length,
+                    allHistory: allHistory.length,
+                    partnerAvgCPM, allAvgCPM, partnerAvgCPE, allAvgCPE, partnerAvgRate, allAvgRate,
+                    score: avgScore
+                };
+            }, [formData, campaigns]);
 
             const handleSubmit = (e) => {
                 e.preventDefault();
@@ -962,27 +1097,101 @@
                 setFormData({ ...formData, name: '', plan: { spend: '', impressions: '', clicks: '', leads: '' }});
             };
 
+            const IconComponent = analysis?.icon === 'CheckCircle2' ? CheckCircle2 :
+                                 analysis?.icon === 'CheckCircle' ? CheckCircle :
+                                 analysis?.icon === 'AlertTriangle' ? AlertTriangle : AlertOctagon;
+
             return html`
-                <div className="max-w-4xl mx-auto bg-white p-8 rounded-sm border border-slate-100 shadow-sm">
-                     <div className="mb-8"><h3 className="text-xl font-light text-slate-900">Campaign Brief</h3><p className="text-sm text-slate-500 mt-2 font-light">Input strategic plan.</p></div>
-                     <form onSubmit=${handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
-                            <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Month</label><input type="month" required className="volvo-input" value=${formData.month} onChange=${e => setFormData({...formData, month: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Objective</label><select className="volvo-input" value=${formData.type} onChange=${e => setFormData({...formData, type: e.target.value})}><option value="Conversion">Lead Generation (Lower Funnel)</option><option value="Awareness">Brand Awareness (Upper Funnel)</option></select></div>
+                <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="bg-white p-8 rounded-sm border border-slate-100 shadow-sm">
+                        <div className="mb-8"><h3 className="text-xl font-light text-slate-900">Campaign Brief</h3><p className="text-sm text-slate-500 mt-2 font-light">Input strategic plan with AI-powered recommendations.</p></div>
+                        <form onSubmit=${handleSubmit} className="space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Month</label><input type="month" required className="volvo-input" value=${formData.month} onChange=${e => setFormData({...formData, month: e.target.value})} /></div>
+                                <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Objective</label><select className="volvo-input" value=${formData.type} onChange=${e => setFormData({...formData, type: e.target.value})}><option value="Conversion">Lead Generation (Lower Funnel)</option><option value="Awareness">Brand Awareness (Upper Funnel)</option></select></div>
+                            </div>
+                            <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Campaign Name</label><input type="text" required className="volvo-input" value=${formData.name} onChange=${e => setFormData({...formData, name: e.target.value})} /></div>
+                            <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Partner</label><div className="grid grid-cols-3 gap-3">${providers.map(p => html`<div key=${p} onClick=${() => setFormData({...formData, provider: p})} className=${`cursor-pointer border rounded-sm px-4 py-3 text-sm text-center transition-all ${formData.provider === p ? 'border-black bg-black text-white' : 'border-slate-200 hover:border-slate-400'}`}>${p}</div>`)}</div></div>
+                            <div className="p-6 bg-slate-50 rounded-sm border border-slate-100 grid grid-cols-3 gap-4">
+                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Budget (£)</label><input type="number" required className="volvo-input" value=${formData.plan.spend} onChange=${e => setFormData({...formData, plan: {...formData.plan, spend: e.target.value}})} /></div>
+                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Impressions</label><input type="number" required className="volvo-input" value=${formData.plan.impressions} onChange=${e => setFormData({...formData, plan: {...formData.plan, impressions: e.target.value}})} /></div>
+                                ${formData.type === 'Awareness' ? html`
+                                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Clicks</label><input type="number" required className="volvo-input" value=${formData.plan.clicks} onChange=${e => setFormData({...formData, plan: {...formData.plan, clicks: e.target.value}})} /></div>
+                                ` : html`
+                                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Leads</label><input type="number" required className="volvo-input" value=${formData.plan.leads} onChange=${e => setFormData({...formData, plan: {...formData.plan, leads: e.target.value}})} /></div>
+                                `}
+                            </div>
+                            <button type="submit" className="volvo-btn-primary w-full py-4 font-bold flex items-center justify-center gap-2"><${PlusCircle} size=${18} /> Add to Plan</button>
+                        </form>
+                    </div>
+
+                    ${analysis ? html`
+                        <div className=${`p-6 rounded-sm border-2 ${analysis.bgColor} animate-fade-in-down`}>
+                            <div className="flex items-start gap-4">
+                                <div className=${`p-3 rounded-full bg-white shadow-sm ${analysis.color}`}>
+                                    <${IconComponent} size=${24} strokeWidth=${2.5} />
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className=${`text-lg font-bold mb-2 ${analysis.color}`}>${analysis.recommendation}</h4>
+                                    <div className="space-y-3">
+                                        <div className="bg-white/60 p-3 rounded-sm">
+                                            <div className="text-xs font-bold text-slate-600 uppercase mb-2">Plan Metrics</div>
+                                            <div className="grid grid-cols-3 gap-4 text-sm">
+                                                <div><span className="text-slate-500">CPM:</span> <span className="font-bold ml-1">${formatCurrency(analysis.cpm)}</span></div>
+                                                ${analysis.cpe > 0 ? html`<div><span className="text-slate-500">${formData.type === 'Awareness' ? 'CPC' : 'CPL'}:</span> <span className="font-bold ml-1">${formatCurrency(analysis.cpe)}</span></div>` : null}
+                                                ${analysis.rate > 0 ? html`<div><span className="text-slate-500">${formData.type === 'Awareness' ? 'CTR' : 'Lead Rate'}:</span> <span className="font-bold ml-1">${analysis.rate.toFixed(2)}%</span></div>` : null}
+                                            </div>
+                                        </div>
+
+                                        ${analysis.partnerHistory > 0 ? html`
+                                            <div className="bg-white/60 p-3 rounded-sm">
+                                                <div className="text-xs font-bold text-slate-600 uppercase mb-2">${formData.provider} Historical Average (${analysis.partnerHistory} campaigns)</div>
+                                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                                    <div><span className="text-slate-500">CPM:</span> <span className="font-bold ml-1">${formatCurrency(analysis.partnerAvgCPM)}</span></div>
+                                                    ${analysis.partnerAvgCPE ? html`<div><span className="text-slate-500">${formData.type === 'Awareness' ? 'CPC' : 'CPL'}:</span> <span className="font-bold ml-1">${formatCurrency(analysis.partnerAvgCPE)}</span></div>` : null}
+                                                    ${analysis.partnerAvgRate ? html`<div><span className="text-slate-500">${formData.type === 'Awareness' ? 'CTR' : 'Lead Rate'}:</span> <span className="font-bold ml-1">${analysis.partnerAvgRate.toFixed(2)}%</span></div>` : null}
+                                                </div>
+                                            </div>
+                                        ` : null}
+
+                                        ${analysis.allHistory > 0 && analysis.partnerHistory === 0 ? html`
+                                            <div className="bg-white/60 p-3 rounded-sm">
+                                                <div className="text-xs font-bold text-slate-600 uppercase mb-2">All Partners Average (${analysis.allHistory} campaigns)</div>
+                                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                                    <div><span className="text-slate-500">CPM:</span> <span className="font-bold ml-1">${formatCurrency(analysis.allAvgCPM)}</span></div>
+                                                    ${analysis.allAvgCPE ? html`<div><span className="text-slate-500">${formData.type === 'Awareness' ? 'CPC' : 'CPL'}:</span> <span className="font-bold ml-1">${formatCurrency(analysis.allAvgCPE)}</span></div>` : null}
+                                                    ${analysis.allAvgRate ? html`<div><span className="text-slate-500">${formData.type === 'Awareness' ? 'CTR' : 'Lead Rate'}:</span> <span className="font-bold ml-1">${analysis.allAvgRate.toFixed(2)}%</span></div>` : null}
+                                                </div>
+                                            </div>
+                                        ` : null}
+
+                                        ${analysis.reasons.length > 0 ? html`
+                                            <div className="bg-white/60 p-3 rounded-sm">
+                                                <div className="text-xs font-bold text-slate-600 uppercase mb-2">Key Insights</div>
+                                                <ul className="space-y-1">
+                                                    ${analysis.reasons.map(reason => html`
+                                                        <li key=${reason} className="text-sm flex items-start gap-2">
+                                                            <span className="text-slate-400 mt-0.5">•</span>
+                                                            <span>${reason}</span>
+                                                        </li>
+                                                    `)}
+                                                </ul>
+                                            </div>
+                                        ` : null}
+
+                                        ${analysis.partnerHistory === 0 && analysis.allHistory === 0 ? html`
+                                            <div className="bg-white/60 p-3 rounded-sm">
+                                                <div className="text-xs text-slate-600">
+                                                    <${Info} size=${14} className="inline mr-1" />
+                                                    No historical ${formData.type} campaign data available for benchmarking. This will be your baseline campaign with ${formData.provider}.
+                                                </div>
+                                            </div>
+                                        ` : null}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Campaign Name</label><input type="text" required className="volvo-input" value=${formData.name} onChange=${e => setFormData({...formData, name: e.target.value})} /></div>
-                        <div><label className="block text-xs font-bold text-slate-900 uppercase mb-2">Partner</label><div className="grid grid-cols-3 gap-3">${providers.map(p => html`<div key=${p} onClick=${() => setFormData({...formData, provider: p})} className=${`cursor-pointer border rounded-sm px-4 py-3 text-sm text-center transition-all ${formData.provider === p ? 'border-black bg-black text-white' : 'border-slate-200 hover:border-slate-400'}`}>${p}</div>`)}</div></div>
-                        <div className="p-6 bg-slate-50 rounded-sm border border-slate-100 grid grid-cols-3 gap-4">
-                            <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Budget (£)</label><input type="number" required className="volvo-input" value=${formData.plan.spend} onChange=${e => setFormData({...formData, plan: {...formData.plan, spend: e.target.value}})} /></div>
-                            <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Impressions</label><input type="number" required className="volvo-input" value=${formData.plan.impressions} onChange=${e => setFormData({...formData, plan: {...formData.plan, impressions: e.target.value}})} /></div>
-                            ${formData.type === 'Awareness' ? html`
-                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Clicks</label><input type="number" required className="volvo-input" value=${formData.plan.clicks} onChange=${e => setFormData({...formData, plan: {...formData.plan, clicks: e.target.value}})} /></div>
-                            ` : html`
-                                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Est. Leads</label><input type="number" required className="volvo-input" value=${formData.plan.leads} onChange=${e => setFormData({...formData, plan: {...formData.plan, leads: e.target.value}})} /></div>
-                            `}
-                        </div>
-                        <button type="submit" className="volvo-btn-primary w-full py-4 font-bold flex items-center justify-center gap-2"><${PlusCircle} size=${18} /> Add to Plan</button>
-                     </form>
+                    ` : null}
                 </div>
             `;
         }
@@ -1252,7 +1461,7 @@
                             ${activeTab === 'visual_timeline' ? html`<${VisualTimelineView} campaigns=${data.campaigns} onSelect=${setSelectedCampaign} />` : null}
                             ${activeTab === 'comparison' ? html`<${ComparisonView} campaigns=${data.campaigns} />` : null}
                             ${activeTab === 'settings' ? html`<${SettingsView} config=${data.config} onSave=${handleConfigSave} />` : null}
-                            ${activeTab === 'planning_input' ? html`<${PlanningView} providers=${PROVIDERS} onSave=${handleAddPlan} rates=${MARKET_RATES} />` : null}
+                            ${activeTab === 'planning_input' ? html`<${PlanningView} providers=${PROVIDERS} onSave=${handleAddPlan} rates=${MARKET_RATES} campaigns=${data.campaigns} />` : null}
                         </main>
                     </div>
                 </div>
