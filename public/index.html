@@ -256,6 +256,54 @@
             `;
         }
 
+        function LoadingSpinner({ size = 24 }) {
+            return html`
+                <div className="flex items-center justify-center p-8">
+                    <div className="animate-spin rounded-full border-b-2 border-black" style=${{ width: `${size}px`, height: `${size}px` }}></div>
+                </div>
+            `;
+        }
+
+        function LoadingSkeleton() {
+            return html`
+                <div className="animate-pulse space-y-4">
+                    <div className="grid grid-cols-4 gap-6">
+                        ${[1,2,3,4].map(i => html`
+                            <div key=${i} className="bg-slate-200 rounded-sm h-32"></div>
+                        `)}
+                    </div>
+                    <div className="bg-slate-200 rounded-sm h-96"></div>
+                </div>
+            `;
+        }
+
+        function Toast({ message, type = 'success', onClose }) {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 3000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+
+            const bgColor = type === 'success' ? 'bg-emerald-600' :
+                           type === 'error' ? 'bg-red-600' :
+                           type === 'warning' ? 'bg-amber-600' : 'bg-black';
+
+            const Icon = type === 'success' ? CheckCircle :
+                        type === 'error' ? AlertCircle :
+                        type === 'warning' ? AlertTriangle : Info;
+
+            return html`
+                <div className=${`fixed bottom-6 right-6 ${bgColor} text-white px-6 py-4 rounded-sm shadow-xl animate-fade-in-up z-50 max-w-md`}>
+                    <div className="flex items-center gap-3">
+                        <${Icon} size=${20} />
+                        <span className="flex-1">${message}</span>
+                        <button onClick=${onClose} className="hover:opacity-75 transition-opacity">
+                            <${X} size=${16} />
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
         function SidebarItem({ active, onClick, icon: Icon, label }) {
             return html`
                 <button onClick=${onClick} className=${`w-full flex items-center gap-3 px-4 py-3 border-l-4 transition-all text-sm group text-left ${active ? 'border-black bg-slate-50 text-black font-bold' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50 font-medium'}`}>
@@ -1204,8 +1252,49 @@
             const [loading, setLoading] = useState(true);
             const [currentUser, setCurrentUser] = useState(null);
             const [selectedCampaign, setSelectedCampaign] = useState(null);
-            const [notification, setNotification] = useState(null);
+            const [toast, setToast] = useState(null);
             const fileInputRef = useRef(null);
+
+            // Keyboard Shortcuts
+            useEffect(() => {
+                const handleKeyPress = (e) => {
+                    // Ignore if user is typing in an input
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                    // D = Dashboard
+                    if (e.key === 'd' || e.key === 'D') {
+                        setActiveTab('performance_overview');
+                    }
+                    // P = Partner Intel
+                    else if (e.key === 'p' || e.key === 'P') {
+                        setActiveTab('partner_intel');
+                    }
+                    // C = Campaigns
+                    else if (e.key === 'c' || e.key === 'C') {
+                        setActiveTab('campaign_list');
+                    }
+                    // N = New Plan
+                    else if (e.key === 'n' || e.key === 'N') {
+                        setActiveTab('planning_input');
+                    }
+                    // F = Funnel
+                    else if (e.key === 'f' || e.key === 'F') {
+                        setActiveTab('funnel');
+                    }
+                    // ? = Help
+                    else if (e.key === '?') {
+                        showToast('Keyboard Shortcuts: D=Dashboard, P=Partners, C=Campaigns, N=New, F=Funnel', 'info');
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyPress);
+                return () => window.removeEventListener('keydown', handleKeyPress);
+            }, []);
+
+            // Helper to show toast notifications
+            const showToast = (message, type = 'success') => {
+                setToast({ message, type });
+            };
 
             // Immediate preloader removal logic
             useEffect(() => {
@@ -1216,14 +1305,14 @@
             // Auth & Data Listener
             useEffect(() => {
                 if(isOffline) {
-                    setNotification("Running in Offline/Demo Mode");
+                    showToast("Running in Offline/Demo Mode", 'warning');
                     setData(INITIAL_DATA);
                     setLoading(false);
                     return;
                 }
 
                 if (!db || !auth) {
-                    setNotification("Firebase Config Missing/Invalid");
+                    showToast("Firebase Config Missing/Invalid", 'error');
                     setLoading(false);
                     return;
                 }
@@ -1240,7 +1329,7 @@
                             setLoading(false);
                         }, (err) => {
                             console.error(err);
-                            setNotification("Data Access Error: " + err.message);
+                            showToast("Data Access Error: " + err.message, 'error');
                             setLoading(false);
                         });
                         return () => unsubData();
@@ -1274,14 +1363,12 @@
                 if (db && !isOffline) {
                     try {
                         await setDoc(doc(db, "marketing", DB_DOC_ID), newData);
-                        setNotification("Saved to Cloud.");
+                        showToast("Saved to Cloud", 'success');
                     } catch(e) {
-                        setNotification("Save Failed: " + e.message);
+                        showToast("Save Failed: " + e.message, 'error');
                     }
-                    setTimeout(() => setNotification(null), 3000);
                 } else if (isOffline) {
-                    setNotification("Saved Locally (Demo Mode)");
-                    setTimeout(() => setNotification(null), 3000);
+                    showToast("Saved Locally (Demo Mode)", 'warning');
                 }
             };
 
@@ -1300,16 +1387,14 @@
                 const newC = { id: Date.now(), status: 'Planned', actuals: null, ...newPlanData };
                 const newData = { ...data, campaigns: [...data.campaigns, newC] };
                 syncToCloud(newData);
-                setNotification("Campaign Plan Added");
-                setTimeout(() => setNotification(null), 3000);
+                showToast("Campaign Plan Added", 'success');
             };
 
             const handleDuplicate = (c) => {
                 const newC = { ...c, id: Date.now(), name: c.name + ' (Copy)', status: 'Planned', actuals: null };
                 const newData = { ...data, campaigns: [...data.campaigns, newC] };
                 syncToCloud(newData);
-                setNotification("Campaign Duplicated.");
-                setTimeout(() => setNotification(null), 3000);
+                showToast("Campaign Duplicated", 'success');
             };
             
             // CSV Export
@@ -1389,9 +1474,10 @@
                     }
                     if (newCampaigns.length > 0) {
                         syncToCloud({ ...data, campaigns: newCampaigns });
-                        setNotification(`Imported ${newCampaigns.length} campaigns.`);
-                    } else { setNotification("Error: No valid data found."); }
-                    setTimeout(() => setNotification(null), 3000);
+                        showToast(`Imported ${newCampaigns.length} campaigns`, 'success');
+                    } else {
+                        showToast("Error: No valid data found", 'error');
+                    }
                 };
                 reader.readAsText(file);
                 e.target.value = '';
@@ -1404,9 +1490,9 @@
 
             // Standard Loading Screen (internal react state)
             if (loading) return html`
-                <div className="flex h-screen items-center justify-center bg-white text-slate-400 gap-3">
-                    <${RefreshCw} class="animate-spin text-slate-300" size=${24} />
-                    <span>Connecting to Database...</span>
+                <div className="flex h-screen items-center justify-center bg-white flex-col gap-4">
+                    <${LoadingSpinner} size=${32} />
+                    <span className="text-sm text-slate-400">Connecting to Database...</span>
                 </div>
             `;
 
@@ -1431,6 +1517,15 @@
                             <${SidebarItem} active=${activeTab === 'planning_input'} onClick=${() => setActiveTab('planning_input')} icon=${PlusCircle} label="Add Plan" />
                         </nav>
                         <div className="p-6 border-t border-slate-100 space-y-4">
+                            <div className="text-[10px] text-slate-400 space-y-1 mb-4">
+                                <div className="font-bold uppercase mb-2">Keyboard Shortcuts</div>
+                                <div>D = Dashboard</div>
+                                <div>P = Partner Intel</div>
+                                <div>C = Campaigns</div>
+                                <div>N = New Plan</div>
+                                <div>F = Funnel</div>
+                                <div>? = Show Shortcuts</div>
+                            </div>
                             <button onClick=${handleLogout} className="w-full flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-red-600"><${LogOut} size=${14}/> Logout</button>
                             <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
                                  ${!isOffline ? html`<${Cloud} size=${12} className="text-emerald-500" />` : html`<${Activity} size=${12} className="text-orange-500" />`}
@@ -1452,7 +1547,7 @@
                         </header>
 
                         <main className="flex-1 overflow-auto p-8">
-                            ${notification ? html`<div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-black text-white px-8 py-3 rounded-sm shadow-xl z-50 animate-fade-in-down">${notification}</div>` : null}
+                            ${toast ? html`<${Toast} message=${toast.message} type=${toast.type} onClose=${() => setToast(null)} />` : null}
                             
                             ${activeTab === 'performance_overview' ? html`<${DashboardView} campaigns=${data.campaigns} config=${data.config} />` : null}
                             ${activeTab === 'partner_intel' ? html`<${PartnerIntelligenceView} campaigns=${data.campaigns} />` : null}
