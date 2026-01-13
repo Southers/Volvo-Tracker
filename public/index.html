@@ -202,35 +202,38 @@
         const calculateAverage = (camps, metric, campaignType) => {
             if (!camps || camps.length === 0) return null;
 
-            const sum = camps.reduce((acc, c) => {
-                if (!c.actuals) return acc;
+            let sum = 0;
+            let validCount = 0;
+
+            camps.forEach(c => {
+                if (!c.actuals) return;
 
                 if (metric === 'cpm') {
-                    if (!c.actuals.impressions || c.actuals.impressions === 0) return acc;
-                    return acc + ((c.actuals.spend / c.actuals.impressions) * 1000);
+                    if (!c.actuals.impressions || c.actuals.impressions === 0) return;
+                    sum += ((c.actuals.spend / c.actuals.impressions) * 1000);
+                    validCount++;
                 }
-
-                if (metric === 'cpe') {
+                else if (metric === 'cpe') {
                     const eng = campaignType === 'Awareness' ? c.actuals.clicks : c.actuals.leads;
-                    if (!eng || eng === 0) return acc;
-                    return acc + (c.actuals.spend / eng);
+                    if (!eng || eng === 0) return;
+                    sum += (c.actuals.spend / eng);
+                    validCount++;
                 }
-
-                if (metric === 'rate') {
-                    if (!c.actuals.impressions || c.actuals.impressions === 0) return acc;
+                else if (metric === 'rate') {
+                    if (!c.actuals.impressions || c.actuals.impressions === 0) return;
                     const eng = campaignType === 'Awareness' ? c.actuals.clicks : c.actuals.leads;
-                    return acc + ((eng / c.actuals.impressions) * 100);
+                    sum += ((eng / c.actuals.impressions) * 100);
+                    validCount++;
                 }
-
-                if (metric === 'roas') {
-                    if (!c.actuals.spend || c.actuals.spend === 0) return acc;
-                    return acc + (c.actuals.gp / c.actuals.spend);
+                else if (metric === 'roas') {
+                    if (!c.actuals.spend || c.actuals.spend === 0) return;
+                    sum += (c.actuals.gp / c.actuals.spend);
+                    validCount++;
                 }
+            });
 
-                return acc;
-            }, 0);
-
-            return sum / camps.length;
+            // Divide by valid campaigns count, not total campaigns
+            return validCount > 0 ? sum / validCount : null;
         };
 
         const DEFAULT_CONFIG = {

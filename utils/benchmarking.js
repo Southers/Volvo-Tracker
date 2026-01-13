@@ -102,46 +102,50 @@ export const RECOMMENDATION_LEVELS = {
 /**
  * Calculate average metric from historical campaigns
  * Guards against division by zero and empty datasets
+ * CRITICAL: Only divides by campaigns with valid data for the metric
  *
  * @param {Array} campaigns - Array of campaign objects
  * @param {string} metric - Metric to calculate ('cpm', 'cpe', 'rate', 'roas')
  * @param {string} campaignType - 'Awareness' or 'Conversion'
- * @returns {number|null} Average value or null if no data
+ * @returns {number|null} Average value or null if no valid data
  */
 export function calculateAverageMetric(campaigns, metric, campaignType) {
   if (!campaigns || campaigns.length === 0) return null;
 
-  const sum = campaigns.reduce((acc, campaign) => {
+  let sum = 0;
+  let validCount = 0;
+
+  campaigns.forEach(campaign => {
     const actuals = campaign.actuals;
-    if (!actuals) return acc;
+    if (!actuals) return;
 
     // Guard against division by zero
     if (metric === 'cpm') {
-      if (!actuals.impressions || actuals.impressions === 0) return acc;
-      return acc + ((actuals.spend / actuals.impressions) * 1000);
+      if (!actuals.impressions || actuals.impressions === 0) return;
+      sum += ((actuals.spend / actuals.impressions) * 1000);
+      validCount++;
     }
-
-    if (metric === 'cpe') {
+    else if (metric === 'cpe') {
       const engagement = campaignType === 'Awareness' ? actuals.clicks : actuals.leads;
-      if (!engagement || engagement === 0) return acc;
-      return acc + (actuals.spend / engagement);
+      if (!engagement || engagement === 0) return;
+      sum += (actuals.spend / engagement);
+      validCount++;
     }
-
-    if (metric === 'rate') {
-      if (!actuals.impressions || actuals.impressions === 0) return acc;
+    else if (metric === 'rate') {
+      if (!actuals.impressions || actuals.impressions === 0) return;
       const engagement = campaignType === 'Awareness' ? actuals.clicks : actuals.leads;
-      return acc + ((engagement / actuals.impressions) * 100);
+      sum += ((engagement / actuals.impressions) * 100);
+      validCount++;
     }
-
-    if (metric === 'roas') {
-      if (!actuals.spend || actuals.spend === 0) return acc;
-      return acc + (actuals.gp / actuals.spend);
+    else if (metric === 'roas') {
+      if (!actuals.spend || actuals.spend === 0) return;
+      sum += (actuals.gp / actuals.spend);
+      validCount++;
     }
+  });
 
-    return acc;
-  }, 0);
-
-  return sum / campaigns.length;
+  // Divide by valid campaigns count, not total campaigns
+  return validCount > 0 ? sum / validCount : null;
 }
 
 /**
