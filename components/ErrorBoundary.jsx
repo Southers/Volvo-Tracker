@@ -10,7 +10,10 @@ class ErrorBoundary extends React.Component {
     this.state = {
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
+      isDetailsOpen: false,
+      isHoveringTryAgain: false,
+      isHoveringDashboard: false
     };
   }
 
@@ -38,17 +41,33 @@ class ErrorBoundary extends React.Component {
     });
   };
 
+  toggleDetails = () => {
+    this.setState(prev => ({ isDetailsOpen: !prev.isDetailsOpen }));
+  };
+
+  handleDetailsKeyDown = (e) => {
+    // Space or Enter to toggle
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      this.toggleDetails();
+    }
+  };
+
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-          backgroundColor: '#fafafa',
-          fontFamily: 'system-ui, -apple-system, sans-serif'
-        }}>
+        <div
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100vh',
+            backgroundColor: '#fafafa',
+            fontFamily: 'system-ui, -apple-system, sans-serif'
+          }}>
           <div style={{
             maxWidth: '600px',
             padding: '40px',
@@ -63,7 +82,7 @@ class ErrorBoundary extends React.Component {
               gap: '12px',
               marginBottom: '24px'
             }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="8" x2="12" y2="12"/>
                 <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -88,7 +107,7 @@ class ErrorBoundary extends React.Component {
             </p>
 
             {process.env.NODE_ENV === 'development' && this.state.error && (
-              <details style={{
+              <div style={{
                 marginBottom: '24px',
                 padding: '16px',
                 backgroundColor: '#fef2f2',
@@ -96,27 +115,49 @@ class ErrorBoundary extends React.Component {
                 borderRadius: '4px',
                 fontSize: '14px'
               }}>
-                <summary style={{ cursor: 'pointer', fontWeight: '600', color: '#991b1b', marginBottom: '12px' }}>
-                  Error Details (Development Only)
-                </summary>
-                <pre style={{
-                  overflow: 'auto',
-                  fontSize: '12px',
-                  color: '#7f1d1d',
-                  margin: 0
-                }}>
-                  {this.state.error.toString()}
-                  {this.state.errorInfo && this.state.errorInfo.componentStack}
-                </pre>
-              </details>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={this.state.isDetailsOpen}
+                  aria-controls="error-details"
+                  onClick={this.toggleDetails}
+                  onKeyDown={this.handleDetailsKeyDown}
+                  style={{
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    color: '#991b1b',
+                    marginBottom: this.state.isDetailsOpen ? '12px' : 0,
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.target.style.textDecoration = 'underline'}
+                  onBlur={(e) => e.target.style.textDecoration = 'none'}
+                >
+                  {this.state.isDetailsOpen ? '▼' : '▶'} Error Details (Development Only)
+                </div>
+                {this.state.isDetailsOpen && (
+                  <pre
+                    id="error-details"
+                    style={{
+                      overflow: 'auto',
+                      fontSize: '12px',
+                      color: '#7f1d1d',
+                      margin: 0
+                    }}>
+                    {this.state.error.toString()}
+                    {this.state.errorInfo && this.state.errorInfo.componentStack}
+                  </pre>
+                )}
+              </div>
             )}
 
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={this.handleReset}
+                onMouseEnter={() => this.setState({ isHoveringTryAgain: true })}
+                onMouseLeave={() => this.setState({ isHoveringTryAgain: false })}
                 style={{
                   padding: '12px 24px',
-                  backgroundColor: '#0f172a',
+                  backgroundColor: this.state.isHoveringTryAgain ? '#1e293b' : '#0f172a',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
@@ -125,31 +166,23 @@ class ErrorBoundary extends React.Component {
                   cursor: 'pointer',
                   transition: 'background-color 0.2s'
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#1e293b'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#0f172a'}
               >
                 Try Again
               </button>
               <button
                 onClick={() => window.location.href = '/'}
+                onMouseEnter={() => this.setState({ isHoveringDashboard: true })}
+                onMouseLeave={() => this.setState({ isHoveringDashboard: false })}
                 style={{
                   padding: '12px 24px',
-                  backgroundColor: 'white',
+                  backgroundColor: this.state.isHoveringDashboard ? '#f8fafc' : 'white',
                   color: '#0f172a',
-                  border: '1px solid #e2e8f0',
+                  border: `1px solid ${this.state.isHoveringDashboard ? '#cbd5e1' : '#e2e8f0'}`,
                   borderRadius: '4px',
                   fontSize: '14px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.backgroundColor = '#f8fafc';
-                  e.target.style.borderColor = '#cbd5e1';
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.backgroundColor = 'white';
-                  e.target.style.borderColor = '#e2e8f0';
                 }}
               >
                 Go to Dashboard

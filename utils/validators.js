@@ -3,20 +3,31 @@
  * Prevents malicious data from entering the system
  */
 
+// NOTE: For browser environments, load DOMPurify via CDN in HTML:
+// <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+
 /**
  * Sanitize string input - remove HTML and dangerous characters
+ * Uses DOMPurify if available, falls back to basic sanitization
  */
 export function sanitizeString(input) {
   if (typeof input !== 'string') return '';
 
-  // Remove HTML tags
+  // Use DOMPurify if available (loaded via CDN)
+  if (typeof window !== 'undefined' && window.DOMPurify) {
+    return window.DOMPurify.sanitize(input, {
+      ALLOWED_TAGS: [], // Strip all HTML tags
+      ALLOWED_ATTR: [],
+      KEEP_CONTENT: true // Keep text content
+    }).trim().slice(0, 500);
+  }
+
+  // Fallback: Basic sanitization
   const withoutHtml = input.replace(/<[^>]*>/g, '');
-
-  // Remove script-like patterns
   const withoutScripts = withoutHtml.replace(/javascript:/gi, '');
+  const withoutEvents = withoutScripts.replace(/on\w+\s*=/gi, '');
 
-  // Trim and limit length
-  return withoutScripts.trim().slice(0, 500);
+  return withoutEvents.trim().slice(0, 500);
 }
 
 /**
@@ -61,7 +72,7 @@ export function validateCampaign(data) {
       errors.impressions = "Impressions must be a positive number";
     }
     if (data.plan.impressions > 100000000) {
-      errors.impressions = "Impressions seems unrealistically high";
+      errors.impressions = "Impressions seem unrealistically high";
     }
     if (data.type === 'Awareness' && (typeof data.plan.clicks !== 'number' || data.plan.clicks < 0)) {
       errors.clicks = "Clicks must be a positive number for Awareness campaigns";
@@ -109,7 +120,7 @@ export function validateConfig(data) {
     errors.annualBudget = "Annual budget must be a positive number";
   }
   if (data.annualBudget > 10000000) {
-    errors.annualBudget = "Annual budget seems unrealistically high";
+    errors.annualBudget = "Annual budget cannot exceed £10,000,000";
   }
 
   const quarters = ['q1', 'q2', 'q3', 'q4'];
@@ -120,10 +131,13 @@ export function validateConfig(data) {
   });
 
   // Check if quarters sum to annual budget (allow 1% variance)
-  const quarterSum = data.q1 + data.q2 + data.q3 + data.q4;
-  const variance = Math.abs(quarterSum - data.annualBudget) / data.annualBudget;
-  if (variance > 0.01) {
-    errors.quarters = "Quarterly budgets should sum to annual budget";
+  // Guard against division by zero
+  if (data.annualBudget > 0) {
+    const quarterSum = data.q1 + data.q2 + data.q3 + data.q4;
+    const variance = Math.abs(quarterSum - data.annualBudget) / data.annualBudget;
+    if (variance > 0.01) {
+      errors.quarters = "Quarterly budgets should sum to annual budget";
+    }
   }
 
   return {
@@ -146,18 +160,24 @@ export function sanitizeCampaign(data) {
 }
 
 /**
- * Validate email format
+ * Validate email format (RFC 5322 compliant)
+ * More robust than basic regex
  */
 export function isValidEmail(email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // RFC 5322 compliant email regex (simplified but accurate)
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
   return emailRegex.test(email);
 }
 
 /**
  * Check if email is from allowed domain
+ * Uses optional chaining to prevent null pointer errors
  */
 export function isAllowedDomain(email) {
+  if (!email || typeof email !== 'string') return false;
+
   const allowedDomains = ['volvocars.com', 'volvo.com'];
   const domain = email.split('@')[1]?.toLowerCase();
-  return allowedDomains.includes(domain);
+
+  return domain ? allowedDomains.includes(domain) : false;
 }
